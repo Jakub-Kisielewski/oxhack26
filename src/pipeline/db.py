@@ -2,7 +2,7 @@
 
 SQLite only for now, but kept Postgres-ready: all SQL lives in this module, the atomic claim is one
 function (claim_next), and only portable SQL is used (ON CONFLICT, RETURNING, window functions).
-Timestamps are ISO 8601 UTC strings with millisecond precision, so they compare correctly as text.
+Every stored time goes through to_iso (UTC 'YYYY-MM-DDTHH:MM:SS+00:00'), so times compare correctly as text.
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import sqlite3
 import statistics
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
 
@@ -90,12 +91,19 @@ def utc_now() -> datetime:
 
 
 def to_iso(t: datetime | str) -> str:
-    """Normalise a timezone-aware datetime (or ISO string) to the canonical UTC text form."""
+    """The one stored time format: UTC 'YYYY-MM-DDTHH:MM:SS+00:00' (sub-seconds truncated).
+
+    Accepts a timezone-aware datetime, an ISO 8601 string ('Z' or any offset) or an HTTP date
+    such as a Last-Modified header ('Sat, 24 Oct 2026 21:01:53 GMT').
+    """
     if isinstance(t, str):
-        t = datetime.fromisoformat(t)
+        try:
+            t = datetime.fromisoformat(t)
+        except ValueError:
+            t = parsedate_to_datetime(t)
     if t.tzinfo is None:
         raise ValueError(f"naive datetime {t!r}; pass a timezone-aware UTC time")
-    return t.astimezone(timezone.utc).isoformat(timespec="milliseconds")
+    return t.astimezone(timezone.utc).isoformat(timespec="seconds")
 
 
 # ------------------------------------------------------------------- connection

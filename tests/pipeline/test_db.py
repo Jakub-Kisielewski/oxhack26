@@ -1,8 +1,10 @@
 import multiprocessing
+import re
 import threading
 import time
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 
 import pytest
 
@@ -34,12 +36,61 @@ def _claim_all(db_url, start_at=0.0, work_s=0.001):
 
 # ------------------------------------------------------------------- helpers
 
-def test_to_iso_normalises_to_utc_and_rejects_naive():
+CANONICAL = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$")
+
+
+def test_to_iso_normalises_every_input_to_one_format():
     bst = timezone(timedelta(hours=1))
-    assert db.to_iso(datetime(2026, 10, 24, 13, 0, tzinfo=bst)) == "2026-10-24T12:00:00.000+00:00"
-    assert db.to_iso("2026-10-24T12:00:00+00:00") == "2026-10-24T12:00:00.000+00:00"
+    expected = "2026-10-24T12:00:00+00:00"
+    assert db.to_iso(datetime(2026, 10, 24, 13, 0, tzinfo=bst)) == expected
+    assert db.to_iso(datetime(2026, 10, 24, 12, 0, 0, 987654, tzinfo=timezone.utc)) == expected
+    assert db.to_iso("2026-10-24T12:00:00Z") == expected
+    assert db.to_iso("2026-10-24T12:00:00.5+00:00") == expected
+    assert db.to_iso("2026-10-24T13:00:00+01:00") == expected
+    assert db.to_iso("Sat, 24 Oct 2026 12:00:00 GMT") == expected
     with pytest.raises(ValueError):
         db.to_iso(datetime(2026, 10, 24, 12, 0))
+
+
+def test_stored_times_share_one_format_and_sort_chronologically(con):
+    """Mix Last-Modified headers, datetime.now(utc) and 'Z' strings; text order must equal time order."""
+    now = datetime.now(timezone.utc)  # has microseconds
+    times = [
+        ("hdr_early", "Sat, 24 Oct 2026 09:59:59 GMT"),
+        ("hdr_late", "Sat, 24 Oct 2026 10:00:01 GMT"),
+        ("iso_z", "2026-10-24T10:00:00Z"),
+        ("bst", datetime(2026, 10, 24, 11, 0, 0, 500000, tzinfo=timezone(timedelta(hours=1)))),  # 10:00:00 UTC
+        ("now", now),
+        ("now_minus", now - timedelta(seconds=1)),
+    ]
+
+    def as_utc(t):  # independent of db.to_iso: parse to an aware datetime, whole seconds
+        if isinstance(t, str):
+            t = parsedate_to_datetime(t) if "GMT" in t else datetime.fromisoformat(t)
+        return t.astimezone(timezone.utc).replace(microsecond=0)
+
+    for cam, t in times:
+        frame_time = parsedate_to_datetime(t) if isinstance(t, str) and "GMT" in t else t  # as the poller will
+        db.insert_observation(con, _obs(cam, frame_time, 1), now=now)
+        clip_id = db.enqueue_clip(con, cam, frame_time, b"x", now=now)
+    db.claim_next(con, now=now)
+    db.mark_done(con, clip_id, now=now)
+
+    stored = [r[0] for r in con.execute(
+        """SELECT frame_time FROM observations UNION ALL SELECT ingested_at FROM observations
+           UNION ALL SELECT frame_time FROM clips UNION ALL SELECT ingested_at FROM clips
+           UNION ALL SELECT claimed_at FROM clips WHERE claimed_at IS NOT NULL
+           UNION ALL SELECT finished_at FROM clips WHERE finished_at IS NOT NULL""")]
+    assert stored and all(CANONICAL.match(s) for s in stored), stored
+
+    by_text = [r[0] for r in con.execute("SELECT camera_id FROM observations ORDER BY frame_time, camera_id")]
+    by_time = [cam for cam, t in sorted(times, key=lambda ct: (as_utc(ct[1]), ct[0]))]
+    assert by_text == by_time
+    assert by_text[:4] == ["hdr_early", "bst", "iso_z", "hdr_late"]
+    # text comparison against a cutoff matches time comparison
+    newer = [r[0] for r in con.execute("SELECT camera_id FROM observations WHERE frame_time >= ? ORDER BY camera_id",
+                                       (db.to_iso("2026-10-24T10:00:00+00:00"),))]
+    assert newer == sorted(["bst", "iso_z", "hdr_late", "now", "now_minus"])
 
 
 def test_sqlite_path_resolution_and_postgres_rejected():
@@ -91,7 +142,7 @@ def test_claim_returns_oldest_first_and_marks_processing(con):
     early = db.enqueue_clip(con, "B", T0, b"early")
     clip = db.claim_next(con, now=T0)
     assert clip["id"] == early and clip["data"] == b"early"
-    assert (clip["status"], clip["attempts"], clip["claimed_at"]) == ("processing", 1, db.to_iso(T0))
+    assert (clip["status"], clip["attempts"], clip["claimed_at"]) == ("processing", 1, "2026-10-24T12:00:00+00:00")
     assert db.claim_next(con)["id"] == late
     assert db.claim_next(con) is None
 
