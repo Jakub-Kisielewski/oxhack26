@@ -95,14 +95,6 @@ python -m src.ingestion
 
 Ingest Met Police conditions posts, OSAC London demonstration alerts, TfL road disruptions, and organizer sites. List platform IDs with `python -m src.ingestion --list-platforms`.
 
-Optional TfL API credentials (higher rate limits):
-
-```bash
-export TFL_APP_ID=your_app_id
-export TFL_APP_KEY=your_app_key
-python -m src.ingestion --met-limit 8 --osac-limit 12 --tfl-days-ahead 30
-```
-
 Each pipeline run writes **one subfolder per platform** (extraction source):
 
 ```
