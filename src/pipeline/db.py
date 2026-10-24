@@ -320,12 +320,15 @@ def insert_observation(con: sqlite3.Connection, obs: Mapping[str, Any], now: dat
     return cur.rowcount == 1
 
 
-def latest_observation_per_camera(con: sqlite3.Connection, since_minutes: int = 60,
+def latest_observation_per_camera(con: sqlite3.Connection, since_minutes: int = 60, active_only: bool = True,
                                   now: datetime | None = None) -> list[dict[str, Any]]:
-    """Every active camera with its newest observation in the last `since_minutes` (obs fields None if none)."""
+    """Cameras (active only by default) with their newest observation in the last `since_minutes`.
+
+    Observation fields are None when there is none.
+    """
     cutoff = to_iso((now or utc_now()) - timedelta(minutes=since_minutes))
     rows = con.execute(
-        """SELECT c.camera_id, c.name, c.lat, c.lon, c.view, c.image_url, c.video_url, c.tier,
+        f"""SELECT c.camera_id, c.name, c.lat, c.lon, c.view, c.image_url, c.video_url, c.tier, c.active,
                   c.homography IS NOT NULL AS calibrated,
                   o.frame_time, o.ingested_at, o.kind, o.people, o.density, o.speed, o.heading, o.quality
            FROM cameras c
@@ -334,7 +337,7 @@ def latest_observation_per_camera(con: sqlite3.Connection, since_minutes: int = 
                                           ORDER BY frame_time DESC, chunk_index DESC) AS rn
              FROM observations WHERE frame_time >= ?
            ) o ON o.camera_id = c.camera_id AND o.rn = 1
-           WHERE c.active = 1
+           {"WHERE c.active = 1" if active_only else ""}
            ORDER BY c.camera_id""",
         (cutoff,),
     ).fetchall()
@@ -349,6 +352,20 @@ def camera_history(con: sqlite3.Connection, camera_id: str, minutes: int = 60,
         """SELECT frame_time, kind, people, density, speed, heading, quality FROM observations
            WHERE camera_id = ? AND frame_time >= ? ORDER BY frame_time, chunk_index""",
         (camera_id, cutoff),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def pipeline_timings(con: sqlite3.Connection, since: datetime | str) -> list[dict[str, Any]]:
+    """Per processed chunk enqueued since `since`: frame_time, enqueue time, observation time, kind, proc_ms."""
+    rows = con.execute(
+        """SELECT c.camera_id, c.kind, c.frame_time, c.ingested_at AS enqueued_at,
+                  o.ingested_at AS observed_at, o.proc_ms
+           FROM clips c
+           JOIN observations o ON o.camera_id = c.camera_id AND o.frame_time = c.frame_time
+                              AND o.chunk_index = c.chunk_index AND o.kind = c.kind
+           WHERE c.ingested_at >= ? ORDER BY c.ingested_at""",
+        (to_iso(since),),
     ).fetchall()
     return [dict(r) for r in rows]
 

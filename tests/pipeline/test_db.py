@@ -229,6 +229,11 @@ def test_latest_observation_per_camera(con):
     assert set(rows) == {"A", "B"}
     assert rows["A"]["people"] == 7 and rows["A"]["speed"] == 0.8 and rows["A"]["calibrated"] == 0
     assert rows["B"]["people"] is None and rows["B"]["frame_time"] is None
+    db.upsert_cameras(con, [_cam("C", active=False)])
+    db.insert_observation(con, _obs("C", T0 - timedelta(minutes=2), 4))
+    assert "C" not in {r["camera_id"] for r in db.latest_observation_per_camera(con, now=T0)}
+    everything = {r["camera_id"]: r for r in db.latest_observation_per_camera(con, active_only=False, now=T0)}
+    assert everything["C"]["people"] == 4 and everything["C"]["active"] == 0
 
 
 def test_camera_history_window_and_order(con):
