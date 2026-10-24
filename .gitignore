@@ -33,6 +33,7 @@ Thumbs.db
 # Vscode
 .vscode/
 
+# dont want to push actual data to repo duhh
 data/
 
 # Local docs / logs (not part of ingestion package)
