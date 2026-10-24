@@ -1,5 +1,6 @@
 import streamlit as st
-import duckdb
+from src.database.db import get_connection
+
 
 st.set_page_config(page_title="London Protest Predictor", layout="wide")
 st.title("London Protest Predictor")
@@ -16,6 +17,6 @@ st.markdown("PyDeck 3D map will render here.")
 # Initialize in-process database
 @st.cache_resource
 def init_db():
-    return duckdb.connect(database=':memory:')
+    return get_connection(read_only=True)
 
 conn = init_db()
