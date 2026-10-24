@@ -21,6 +21,11 @@
   `clips.path` is nullable since bytes live in `clips.data`. `observations` also carries `chunk_index` and `kind`.
   Both UNIQUE keys are `(camera_id, frame_time, chunk_index, kind)`. The pipeline DB is SQLite only
   (`data/pipeline.db`), with SQL kept in `src/pipeline/db.py` so Postgres can be added later.
+- **Camera registry (Step 2):** no `--mode route|bbox`. One run, `python -m src.pipeline.cameras [--list]`,
+  registers every TfL camera inside `src/pipeline/zones_1_2.geojson` (an approximate boundary: zone 1–2 station hull
+  + 500 m) and assigns tiers (route via `cameras_along_route`, then `CENTRAL_BBOX`, else 0). Refresh never deletes:
+  missing or `available=false` cameras get `active=0` and return to 1 when back. Manual tiers in
+  `data/camera_overrides.json` (`{camera_id: tier}`, local and gitignored) win over computed tiers on every refresh.
 - **Tests:** `.gitignore` no longer ignores `tests/`, `test_*.py`, `*_test.py`.
 - **Reference poller:** `jamcam_poller.py` lives at `src/pipeline/jamcam_poller.py` (logic unchanged; CLI is
   `python -m src.pipeline.jamcam_poller --list`). Other modules import its functions from there.

@@ -40,6 +40,7 @@ class Settings:
     radius_m: float = 300.0
     central_bbox: tuple[float, float, float, float] = DEFAULT_BBOX
     camera_refresh_seconds: int = 600
+    camera_overrides_path: str = "data/camera_overrides.json"  # {camera_id: tier}; relative to the repo root
     # poller
     poll_seconds: int = 15
     still_poll_seconds: int = 60
@@ -67,6 +68,7 @@ _PARSERS = {
     "RADIUS_M": ("radius_m", float),
     "CENTRAL_BBOX": ("central_bbox", _floats),
     "CAMERA_REFRESH_SECONDS": ("camera_refresh_seconds", int),
+    "CAMERA_OVERRIDES_PATH": ("camera_overrides_path", str),
     "POLL_SECONDS": ("poll_seconds", int),
     "STILL_POLL_SECONDS": ("still_poll_seconds", int),
     "TIER1_ENABLED": ("tier1_enabled", _bool),

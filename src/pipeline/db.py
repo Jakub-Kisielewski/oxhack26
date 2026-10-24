@@ -150,21 +150,43 @@ def init_db(con: sqlite3.Connection) -> None:
 # ------------------------------------------------------------------- cameras
 
 def upsert_cameras(con: sqlite3.Connection, cameras: Iterable[Mapping[str, Any]],
-                   now: datetime | None = None) -> int:
-    """Insert or refresh cameras (keyed on camera_id); keeps any stored homography."""
+                   deactivate_missing: bool = False, now: datetime | None = None) -> int:
+    """Insert or refresh cameras keyed on camera_id. Never deletes; keeps any stored homography.
+
+    Each row's `active` defaults to 1. With deactivate_missing=True, every camera not in `cameras`
+    is set active=0 in the same transaction.
+    """
     ts = to_iso(now or utc_now())
-    rows = [tuple(c.get(k) for k in CAMERA_COLUMNS[:-1]) + (int(c.get("tier") or 0), ts) for c in cameras]
+    rows = [tuple(c.get(k) for k in CAMERA_COLUMNS[:-1])
+            + (int(c.get("tier") or 0), int(c.get("active", True)), ts) for c in cameras]
+    if deactivate_missing and not rows:
+        raise ValueError("refusing to deactivate every camera: empty camera list")
     with _tx(con):
         con.executemany(
             """INSERT INTO cameras (camera_id, name, lat, lon, view, image_url, video_url, tier, active, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT (camera_id) DO UPDATE SET
                  name = excluded.name, lat = excluded.lat, lon = excluded.lon, view = excluded.view,
                  image_url = excluded.image_url, video_url = excluded.video_url, tier = excluded.tier,
-                 active = 1, updated_at = excluded.updated_at""",
+                 active = excluded.active, updated_at = excluded.updated_at""",
             rows,
         )
+        if deactivate_missing:
+            marks = ", ".join("?" for _ in rows)
+            con.execute(
+                f"UPDATE cameras SET active = 0, updated_at = ? WHERE active = 1 AND camera_id NOT IN ({marks})",
+                (ts, *(r[0] for r in rows)),
+            )
     return len(rows)
+
+
+def camera_tier_summary(con: sqlite3.Connection) -> list[dict[str, Any]]:
+    """Per tier (highest first): number of registered cameras and how many are active."""
+    rows = con.execute(
+        """SELECT tier, COUNT(*) AS cameras, SUM(active) AS active FROM cameras
+           GROUP BY tier ORDER BY tier DESC"""
+    ).fetchall()
+    return [dict(r) for r in rows]
 
 
 # ------------------------------------------------------------------- queue
