@@ -7,13 +7,17 @@ import pandas as pd
 
 from src.pipeline.config import SETTINGS
 
-TIER_LABELS = {2: "Route: clips every 15 s", 1: "Central box: stills every 60 s", 0: "Registered, not polled"}
 TIER_RADIUS_M = {2: 34, 1: 24, 0: 18}
 NO_DATA_COLOUR = [150, 150, 150, 150]
 # people count -> colour, interpolated on log1p(count); 10+ people is the darkest
 RAMP = [(0, [255, 237, 160]), (2, [254, 178, 76]), (5, [240, 59, 32]), (10, [128, 0, 38])]
 DECK_COLUMNS = ["camera_id", "name", "view", "lat", "lon", "tier", "active", "status", "color", "radius",
                 "people_txt", "age_txt", "image_url", "video_url"]
+
+
+def tier_label(tier: int) -> str:
+    text = SETTINGS.tier_description(tier)
+    return text[0].upper() + text[1:]
 
 
 def people_colour(people: float) -> list[int]:

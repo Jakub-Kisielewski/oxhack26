@@ -9,13 +9,16 @@
   only that registration line; existing pages are not touched. Existing helpers in `src/ui/` are reused where
   they fit.
 - **Coverage:** all available JamCams in TfL zones 1–2 are registered. `cameras.tier` replaces `on_route`:
-  - **2** = route cameras: `HEAD` every 15 s, full clip processing (YOLO + flow).
-  - **1** = central box: poll the still every 60 s, count people on the still only. Off by default; enabled
-    only if Step 5 shows spare worker capacity.
-  - **0** = everything else: registered, not polled. Shown grey on the map and still clickable (the viewer
-    loads TfL's image and clip directly, no processing).
-  Tier assignment is configurable; Step 0 and Step 5 measurements decide tier sizes. Never poll all zones 1–2
-  cameras every 15 s.
+  - **2** = route cameras: clips, polled every 15 s.
+  - **1** = central box: clips, polled every 15 s (`TIER1_KIND`, `TIER1_POLL_SECONDS`; promoted from stills after
+    Step 5 showed < 1% worker load).
+  - **0** = rest of zones 1–2: stills, polled every 60 s (`TIER0_ENABLED`, `TIER0_KIND`, `TIER0_POLL_SECONDS`).
+  Each tier has its own polling loop and interval; all share one `requests.Session` and a bounded HEAD pool ordered
+  by tier, so tier 2 never waits behind other tiers. A loop never overlaps itself: an overrun skips the missed ticks
+  and logs `tier N overran`. Rounds are recorded in `poll_rounds` (duration, bytes, overrun). Tier assignment is
+  configurable via overrides.
+- **LAG:** `LAG_SECONDS=60` for clips, `STILL_LAG_SECONDS=90` for stills (Step 5: frame → observation is bounded by
+  the poll interval, not processing).
 - **Schema additions (Step 1):** `clips.kind` (`clip` | `still`), `clips.attempts` (a clip whose claim expires
   `MAX_ATTEMPTS` times is failed, not requeued forever), `clips.finished_at` (for seconds per chunk), and
   `clips.path` is nullable since bytes live in `clips.data`. `observations` also carries `chunk_index` and `kind`.

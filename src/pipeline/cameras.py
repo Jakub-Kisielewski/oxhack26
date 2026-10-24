@@ -20,7 +20,6 @@ log = logging.getLogger(__name__)
 
 ZONES_GEOJSON = Path(__file__).with_name("zones_1_2.geojson")
 TIERS = (0, 1, 2)
-TIER_LABELS = {2: "route: clips every 15 s", 1: "central box: stills every 60 s", 0: "registered, not polled"}
 
 _TO_BNG = Transformer.from_crs("EPSG:4326", "EPSG:27700", always_xy=True)  # British National Grid, metres
 
@@ -131,11 +130,11 @@ def refresh_cameras(con, settings: Settings = SETTINGS,
     return RefreshResult(db.camera_tier_summary(con), changes)
 
 
-def format_summary(summary: list[dict[str, Any]]) -> str:
-    lines = [f"{'tier':>4}  {'meaning':<32} {'cameras':>7} {'active':>6}"]
+def format_summary(summary: list[dict[str, Any]], settings: Settings = SETTINGS) -> str:
+    lines = [f"{'tier':>4}  {'polling':<34} {'cameras':>7} {'active':>6}"]
     for r in summary:
-        lines.append(f"{r['tier']:>4}  {TIER_LABELS.get(r['tier'], ''):<32} {r['cameras']:>7} {r['active']:>6}")
-    lines.append(f"{'total':>5} {'':<32} {sum(r['cameras'] for r in summary):>7} "
+        lines.append(f"{r['tier']:>4}  {settings.tier_description(r['tier']):<34} {r['cameras']:>7} {r['active']:>6}")
+    lines.append(f"{'total':>5} {'':<34} {sum(r['cameras'] for r in summary):>7} "
                  f"{sum(r['active'] for r in summary):>6}")
     return "\n".join(lines)
 

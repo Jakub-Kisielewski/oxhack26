@@ -5,7 +5,7 @@ import argparse
 import statistics
 import time
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Callable
 
 from src.pipeline import db
 from src.pipeline.config import SETTINGS
@@ -49,15 +49,27 @@ def latency_summary(timings: list[dict[str, Any]]) -> dict[str, dict[str, float]
     return out
 
 
-def late_counts(timings: list[dict[str, Any]], lag_s: float) -> dict[str, tuple[int, int]]:
-    """Per kind: (rows whose observation was written more than lag_s after its frame_time, all rows).
+def late_counts(timings: list[dict[str, Any]], lag_for: Callable[[str], float]) -> dict[tuple[int, str], tuple[int, int]]:
+    """Per (tier, kind): (rows written more than lag_for(kind) after their frame_time, all rows).
 
     The twin reads frame_time <= now - LAG, so these rows would arrive too late and be skipped.
     """
     out = {}
-    for kind in sorted({t["kind"] for t in timings}):
-        delays = [_secs(t["frame_time"], t["observed_at"]) for t in timings if t["kind"] == kind]
-        out[kind] = (sum(d > lag_s for d in delays), len(delays))
+    for tier, kind in sorted({(t["tier"], t["kind"]) for t in timings}, key=lambda tk: (-(tk[0] or 0), tk[1])):
+        delays = [_secs(t["frame_time"], t["observed_at"]) for t in timings if (t["tier"], t["kind"]) == (tier, kind)]
+        out[(tier, kind)] = (sum(d > lag_for(kind) for d in delays), len(delays))
+    return out
+
+
+def round_summary(rounds: list[dict[str, Any]], window_s: float) -> dict[int, dict[str, float]]:
+    """Per tier: rounds, median / max round seconds, overruns, media KB/s over the window."""
+    out = {}
+    for tier in sorted({r["tier"] for r in rounds}, reverse=True):
+        rs = [r for r in rounds if r["tier"] == tier]
+        secs = [r["seconds"] for r in rs]
+        out[tier] = {"rounds": len(rs), "median_s": statistics.median(secs), "max_s": max(secs),
+                     "overruns": sum(r["overran"] for r in rs), "kb_per_s": sum(r["bytes"] or 0 for r in rs) / 1024 / window_s,
+                     "kind": rs[0]["kind"]}
     return out
 
 
@@ -70,10 +82,12 @@ def proc_ms_by_kind(timings: list[dict[str, Any]]) -> dict[str, dict[str, float]
     return out
 
 
-def report(con, minutes: int = 10, now: datetime | None = None, lag_s: float = SETTINGS.lag_seconds) -> str:
+def report(con, minutes: int = 10, now: datetime | None = None,
+           lag_for: Callable[[str], float] = SETTINGS.lag_for) -> str:
     now = now or db.utc_now()
     s = db.queue_stats(con, window_minutes=minutes, now=now)
     timings = db.pipeline_timings(con, now - timedelta(minutes=minutes))
+    rounds = db.poll_rounds_since(con, now - timedelta(minutes=minutes))
     lines = [
         f"queue: {s['by_status']}",
         f"observations in the last {minutes} min: {s['observations_recent']}",
@@ -86,9 +100,14 @@ def report(con, minutes: int = 10, now: datetime | None = None, lag_s: float = S
         lines.append(f"proc {kind}: n={v['n']} median {v['median_ms']:.0f} ms, p95 {v['p95_ms']:.0f} ms")
     for name, v in latency_summary(timings).items():
         lines.append(f"{name}: median {v['median']:.0f} s, p95 {v['p95']:.0f} s, max {v['max']:.0f} s")
-    late = late_counts(timings, lag_s)
-    if late:
-        lines.append(f"late at LAG_SECONDS={lag_s:g}: " + ", ".join(f"{k} {n}/{total}" for k, (n, total) in late.items()))
+    summary = round_summary(rounds, minutes * 60) if rounds else {}
+    for tier, r in summary.items():
+        lines.append(f"tier {tier} {r['kind']} rounds: {r['rounds']}, median {r['median_s']:.1f} s, max {r['max_s']:.1f} s, "
+                     f"overruns {r['overruns']}, {r['kb_per_s']:.1f} KB/s")
+    if summary:
+        lines.append(f"network (media downloads, all tiers): {sum(r['kb_per_s'] for r in summary.values()):.1f} KB/s")
+    for (tier, kind), (n, total) in late_counts(timings, lag_for).items():
+        lines.append(f"late at LAG {lag_for(kind):g} s: tier {tier} {kind} {n}/{total}")
     for b in bursts(timings):
         lines.append(f"burst {b['start']}: {b['chunks']} chunks {'+'.join(b['kinds'])}, enqueued over "
                      f"{b['enqueue_span_s']:.0f} s, drained in {b['drain_s']:.0f} s")

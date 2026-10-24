@@ -9,7 +9,7 @@ from streamlit.testing.v1 import AppTest
 from src.pipeline import db
 from src.pipeline.config import REPO_ROOT, Settings
 from src.ui import live_data
-from src.ui.live_display import NO_DATA_COLOUR, age_text, cache_buster, people_colour, prepare
+from src.ui.live_display import NO_DATA_COLOUR, age_text, cache_buster, people_colour, prepare, tier_label
 
 NOW = datetime(2026, 10, 25, 12, 0, tzinfo=timezone.utc)
 
@@ -35,6 +35,10 @@ def test_people_colour_ramp():
     assert people_colour(10)[:3] == [128, 0, 38] == people_colour(50)[:3]
     reds = [people_colour(p)[1] for p in (0, 1, 2, 5, 10)]
     assert reds == sorted(reds, reverse=True)  # darker as counts rise
+
+
+def test_tier_label_is_capitalised_settings_text():
+    assert tier_label(2) == "Route: clips every 15 s"
 
 
 def test_age_text():

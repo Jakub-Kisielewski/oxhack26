@@ -7,7 +7,7 @@ import pydeck as pdk
 import streamlit as st
 
 from src.ui.live_data import load_cameras, load_history, load_queue_stats
-from src.ui.live_display import DECK_COLUMNS, TIER_LABELS, age_text, cache_buster, prepare
+from src.ui.live_display import DECK_COLUMNS, age_text, cache_buster, prepare, tier_label
 
 st.title("Live cameras: zones 1 & 2")
 
@@ -79,7 +79,7 @@ def live_view() -> None:
         st.subheader(row["name"])
         if row["view"]:
             st.caption(row["view"])
-        st.markdown(f"**Tier {row['tier']}**: {TIER_LABELS.get(row['tier'], '')}  \n"
+        st.markdown(f"**Tier {row['tier']}**: {tier_label(row['tier'])}  \n"
                     f"**Status:** {row['status']}  \n`{selected[0]['camera_id']}`")
         if not row["active"]:
             st.warning("TfL lists this camera as unavailable; its feed may be blank.")
@@ -95,7 +95,7 @@ def live_view() -> None:
                 st.caption("This reading is stale (older than 15 min).")
         else:
             st.markdown("**Latest reading:** none in the last hour"
-                        + (" (tier 0 cameras are not polled)" if row["tier"] == 0 else ""))
+                        + (" (this tier is not polled)" if "not polled" in tier_label(row["tier"]) else ""))
         bust = cache_buster(row)
         st.image(f"{row['image_url']}?t={bust}", caption="Latest still (TfL updates about every 5 min)",
                  width="stretch")

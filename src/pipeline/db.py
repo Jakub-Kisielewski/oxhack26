@@ -19,7 +19,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS cameras (
   camera_id TEXT PRIMARY KEY, name TEXT, lat REAL, lon REAL, view TEXT,
   image_url TEXT, video_url TEXT,
-  tier INTEGER NOT NULL DEFAULT 0,          -- 2 = route (clips), 1 = central box (stills), 0 = not polled
+  tier INTEGER NOT NULL DEFAULT 0,          -- 2 = route, 1 = central box, 0 = rest (see Settings.tier_description)
   homography TEXT,                          -- JSON 3x3, NULL until calibrated
   active INTEGER NOT NULL DEFAULT 1,
   updated_at TEXT
@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS clips (          -- also the job queue
   data BLOB,                                -- media bytes; NULL once processed
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'done', 'failed')),
   attempts INTEGER NOT NULL DEFAULT 0,
+  size_bytes INTEGER,                       -- downloaded size, kept after data is dropped
   error TEXT, ingested_at TEXT NOT NULL, claimed_at TEXT, finished_at TEXT,
   UNIQUE (camera_id, frame_time, chunk_index, kind)
 );
@@ -54,6 +55,14 @@ CREATE TABLE IF NOT EXISTS observations (
 );
 CREATE INDEX IF NOT EXISTS idx_obs_frame_time ON observations (frame_time);
 CREATE INDEX IF NOT EXISTS idx_obs_camera_time ON observations (camera_id, frame_time);
+
+CREATE TABLE IF NOT EXISTS poll_rounds (    -- one row per poller round, per tier
+  tier INTEGER NOT NULL, kind TEXT NOT NULL, started_at TEXT NOT NULL, seconds REAL NOT NULL,
+  checked INTEGER, new INTEGER, enqueued INTEGER, unchanged INTEGER, stale INTEGER, errors INTEGER,
+  bytes INTEGER,                            -- media bytes downloaded (GET bodies)
+  overran INTEGER NOT NULL DEFAULT 0        -- round took longer than the tier's interval
+);
+CREATE INDEX IF NOT EXISTS idx_poll_rounds_started ON poll_rounds (started_at);
 
 CREATE TABLE IF NOT EXISTS station_crowding (naptan TEXT, time TEXT, pct_baseline REAL, ingested_at TEXT,
                                              UNIQUE (naptan, time));
@@ -77,7 +86,7 @@ CREATE VIEW IF NOT EXISTS latest_police_posts AS
 """
 
 # Columns added after a table was first created: init_db adds them to existing DB files.
-ADDED_COLUMNS = {"observations": {"proc_ms": "INTEGER"}}
+ADDED_COLUMNS = {"observations": {"proc_ms": "INTEGER"}, "clips": {"size_bytes": "INTEGER"}}
 
 CAMERA_COLUMNS = ("camera_id", "name", "lat", "lon", "view", "image_url", "video_url", "tier")
 OBSERVATION_COLUMNS = (
@@ -244,11 +253,11 @@ def enqueue_clip(con: sqlite3.Connection, camera_id: str, frame_time: datetime |
                  now: datetime | None = None) -> int | None:
     """Queue one chunk; returns its id, or None if (camera, frame_time, chunk, kind) is already queued."""
     row = con.execute(
-        """INSERT INTO clips (camera_id, frame_time, chunk_index, kind, etag, data, ingested_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)
+        """INSERT INTO clips (camera_id, frame_time, chunk_index, kind, etag, data, size_bytes, ingested_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (camera_id, frame_time, chunk_index, kind) DO NOTHING
            RETURNING id""",
-        (camera_id, to_iso(frame_time), chunk_index, kind, etag, data, to_iso(now or utc_now())),
+        (camera_id, to_iso(frame_time), chunk_index, kind, etag, data, len(data), to_iso(now or utc_now())),
     ).fetchall()
     return row[0]["id"] if row else None
 
@@ -359,14 +368,34 @@ def camera_history(con: sqlite3.Connection, camera_id: str, minutes: int = 60,
 def pipeline_timings(con: sqlite3.Connection, since: datetime | str) -> list[dict[str, Any]]:
     """Per processed chunk enqueued since `since`: frame_time, enqueue time, observation time, kind, proc_ms."""
     rows = con.execute(
-        """SELECT c.camera_id, c.kind, c.frame_time, c.ingested_at AS enqueued_at,
+        """SELECT c.camera_id, k.tier, c.kind, c.frame_time, c.ingested_at AS enqueued_at,
                   o.ingested_at AS observed_at, o.proc_ms
            FROM clips c
            JOIN observations o ON o.camera_id = c.camera_id AND o.frame_time = c.frame_time
                               AND o.chunk_index = c.chunk_index AND o.kind = c.kind
+           LEFT JOIN cameras k ON k.camera_id = c.camera_id
            WHERE c.ingested_at >= ? ORDER BY c.ingested_at""",
         (to_iso(since),),
     ).fetchall()
+    return [dict(r) for r in rows]
+
+
+POLL_ROUND_COLUMNS = ("tier", "kind", "started_at", "seconds", "checked", "new", "enqueued", "unchanged",
+                      "stale", "errors", "bytes", "overran")
+
+
+def record_poll_round(con: sqlite3.Connection, round_: Mapping[str, Any]) -> None:
+    """Store one poller round (see POLL_ROUND_COLUMNS)."""
+    row = {k: round_.get(k) for k in POLL_ROUND_COLUMNS}
+    row["started_at"] = to_iso(row["started_at"])
+    row["overran"] = int(bool(row["overran"]))
+    con.execute(f"INSERT INTO poll_rounds ({', '.join(row)}) VALUES ({', '.join('?' for _ in row)})",
+                tuple(row.values()))
+
+
+def poll_rounds_since(con: sqlite3.Connection, since: datetime | str) -> list[dict[str, Any]]:
+    rows = con.execute("SELECT * FROM poll_rounds WHERE started_at >= ? ORDER BY started_at",
+                       (to_iso(since),)).fetchall()
     return [dict(r) for r in rows]
 
 

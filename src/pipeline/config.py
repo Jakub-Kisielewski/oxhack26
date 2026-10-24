@@ -45,10 +45,14 @@ class Settings:
     # {camera_id: tier}, relative to the repo root: shared (committed) file, then a local file that wins
     camera_overrides_path: str = "config/camera_overrides.json"
     local_camera_overrides_path: str = "data/camera_overrides.json"
-    # poller
+    # poller: one loop per tier (tier 2 always on; clips every POLL_SECONDS)
     poll_seconds: int = 15
-    still_poll_seconds: int = 60
-    tier1_enabled: bool = False
+    tier1_enabled: bool = True
+    tier1_kind: str = "clip"       # clip | still
+    tier1_poll_seconds: int = 15
+    tier0_enabled: bool = True
+    tier0_kind: str = "still"
+    tier0_poll_seconds: int = 60
     head_threads: int = 16
     stale_after_s: int = 900
     chunk_seconds: int = 15
@@ -61,9 +65,24 @@ class Settings:
     # queue
     claim_timeout_s: int = 300
     max_attempts: int = 3
-    # twin
-    lag_seconds: int = 45
+    # twin: rows are late if written more than LAG after frame_time; stills are polled less often
+    lag_seconds: int = 60
+    still_lag_seconds: int = 90
     twin_tick_seconds: int = 15
+
+    def tier_description(self, tier: int) -> str:
+        """What the poller does with a tier, e.g. 'central box: clips every 15 s'."""
+        area = {2: "route", 1: "central box", 0: "rest of zones 1-2"}.get(tier, f"tier {tier}")
+        polling = {2: (True, "clip", self.poll_seconds),
+                   1: (self.tier1_enabled, self.tier1_kind, self.tier1_poll_seconds),
+                   0: (self.tier0_enabled, self.tier0_kind, self.tier0_poll_seconds)}.get(tier)
+        if polling is None or not polling[0]:
+            return f"{area}: not polled"
+        return f"{area}: {polling[1]}s every {polling[2]:g} s"
+
+    def lag_for(self, kind: str) -> int:
+        """LAG for observations of this media kind."""
+        return self.still_lag_seconds if kind == "still" else self.lag_seconds
 
     @property
     def route_lines(self) -> tuple[tuple[tuple[float, float], ...], ...]:
@@ -80,8 +99,12 @@ _PARSERS = {
     "CAMERA_OVERRIDES_PATH": ("camera_overrides_path", str),
     "LOCAL_CAMERA_OVERRIDES_PATH": ("local_camera_overrides_path", str),
     "POLL_SECONDS": ("poll_seconds", int),
-    "STILL_POLL_SECONDS": ("still_poll_seconds", int),
     "TIER1_ENABLED": ("tier1_enabled", _bool),
+    "TIER1_KIND": ("tier1_kind", str),
+    "TIER1_POLL_SECONDS": ("tier1_poll_seconds", int),
+    "TIER0_ENABLED": ("tier0_enabled", _bool),
+    "TIER0_KIND": ("tier0_kind", str),
+    "TIER0_POLL_SECONDS": ("tier0_poll_seconds", int),
     "HEAD_THREADS": ("head_threads", int),
     "STALE_AFTER_S": ("stale_after_s", int),
     "CHUNK_SECONDS": ("chunk_seconds", int),
@@ -93,6 +116,7 @@ _PARSERS = {
     "CLAIM_TIMEOUT_S": ("claim_timeout_s", int),
     "MAX_ATTEMPTS": ("max_attempts", int),
     "LAG_SECONDS": ("lag_seconds", int),
+    "STILL_LAG_SECONDS": ("still_lag_seconds", int),
     "TWIN_TICK_SECONDS": ("twin_tick_seconds", int),
 }
 

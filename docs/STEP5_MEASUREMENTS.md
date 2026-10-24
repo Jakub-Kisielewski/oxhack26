@@ -64,3 +64,26 @@ tonight) delays the next tier-2 round past its 15 s interval. Running each tier 
 Night counts are too low to choose a model; re-run `python scripts/bench_detect.py` (and `--tier 1`) in daylight.
 `scripts/debug_detect.py` checks showed the zeros are genuine (empty wet streets) and that distant people
 (~10–20 px tall at 352×288) are missed, so counts are a lower bound. Default stays `yolov8n@640` until the daylight run.
+
+## Per-tier polling run: poller (3 tier loops) + 2 workers, 10 min (23:46–23:56 UTC)
+
+Tier 2 clips every 15 s (7 cameras), tier 1 clips every 15 s (108), tier 0 stills every 60 s (321). LAG 60 s for
+clips, 90 s for stills. 891 chunks processed, 0 failed; clip processing median 100 ms, still 6 ms; enqueue →
+observation max 6 s.
+
+| | Tier 2 clips | Tier 1 clips | Tier 0 stills |
+|---|---|---|---|
+| **First 4 min**: round median / max | 1.9 / 45.4 s | 2.9 / 137.7 s | 181.6 s (one round) |
+| late | 8/13 | 108/108 | 314/318 |
+| **After 4 min**: round median / max | 1.1 / 8.8 s | 4.1 / 35.4 s | 9.7 / 54.4 s |
+| overruns | 0 | 1 | 0 |
+| media download | 2.7 KB/s | 37.4 KB/s | 17.4 KB/s |
+| late | 0/9 | 0/130 | 21/313 |
+| frame → observation median / max | 8 / 13 s | 14 / 48 s | 34 / 102 s |
+
+Steady-state network: ~58 KB/s of media (all tiers), on a connection that managed ~100 KB/s tonight.
+
+- **Startup surge:** the first round of each loop downloads every camera's current upload (up to ~9 min old, already
+  late). On a slow link that saturates the 16 HEAD threads and the bandwidth, and even tier 2 rounds stretched to
+  45 s: the priority pool orders waiting tasks but cannot preempt running downloads.
+- **Tier 0:** frame → observation reaches 102 s (60 s poll + rounds up to 54 s), so 7% of stills are late at 90 s.
