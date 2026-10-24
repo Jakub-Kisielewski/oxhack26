@@ -35,6 +35,7 @@ Thumbs.db
 
 # dont want to push actual data to repo duhh
 data/
+testing/
 
 # Local docs / logs (not part of ingestion package)
 implementation_plan.md

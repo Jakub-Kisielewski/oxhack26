@@ -5,8 +5,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from ingestion.client import HttpClient, tfl_params
-from ingestion.models import ProtestRecord
+from ingestion.crawler.client import HttpClient, tfl_params
+from ingestion.crawler.models import ProtestRecord
 
 TFL_API = "https://api.tfl.gov.uk/Road/all/Disruption"
 

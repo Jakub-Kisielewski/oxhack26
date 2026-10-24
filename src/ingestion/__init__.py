@@ -1,1 +1,1 @@
-"""Tier 1 London protest ingestion (Met Police, OSAC, TfL)."""
+"""Ingestion layer entrypoints live under ``ingestion.crawler``."""

@@ -66,7 +66,6 @@ python -m src.{waiting for global ingestion script}
 streamlit run app.py
 ```
 
-
 ## LIST OF APIS CURRENTLY USED
 https://news.met.police.uk/latest_news/tag/central-london
 https://www.osac.gov/Country/UnitedKingdom/Content/Search?contentTypes=Report&subContentTypes=Travel%20Advisories%2CAlerts
@@ -84,3 +83,40 @@ https://standuptoracism.org.uk/events/
 https://extinctionrebellion.uk/category/actions/
 https://youthdemand.org/news-press/
 https://defendourjuries.net/press-releases/
+
+## Protest ingestion
+
+From the repo root (use `.venv`, not conda `base`):
+
+```bash
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python -m src.ingestion
+```
+
+Ingest Met Police conditions posts, OSAC London demonstration alerts, TfL road disruptions, and organizer sites. List platform IDs with `python -m src.ingestion --list-platforms`.
+
+Optional TfL API credentials (higher rate limits):
+
+```bash
+export TFL_APP_ID=your_app_id
+export TFL_APP_KEY=your_app_key
+python -m src.ingestion --met-limit 8 --osac-limit 12 --tfl-days-ahead 30
+```
+
+Each pipeline run writes **one subfolder per platform** (extraction source):
+
+```
+data/runs/{run_id}/
+  met_police/
+    records.json
+    media/{article_id}/*.jpg    # condition route maps
+  osac/
+    records.json
+  tfl_road_disruption/
+    records.json
+  _all/
+    protests_flat.json
+    protests.parquet
+```
+
+After `python -m src.ingestion`, open e.g. `data/runs/<run_id>/osac/records.json`.

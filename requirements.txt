@@ -20,5 +20,6 @@ pandas>=2.2.2
 
 # --- Data Ingestion & APIs ---
 requests>=2.31.0
+cloudscraper>=1.2.71
 protobuf>=4.25.3
 gtfs-realtime-bindings>=0.0.7
