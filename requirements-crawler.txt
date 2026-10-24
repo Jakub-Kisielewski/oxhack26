@@ -1,0 +1,5 @@
+# Minimal deps for run_test_pipeline.py (Tier 1 crawlers)
+requests>=2.31.0
+duckdb>=1.0.0
+pandas>=2.2.2
+pyarrow>=15.0.0

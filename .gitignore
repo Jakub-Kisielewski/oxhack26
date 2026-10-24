@@ -35,6 +35,16 @@ Thumbs.db
 
 data/
 
+# Local docs / logs (not part of ingestion package)
+implementation_plan.md
+progression_log.md
+
+# Test / scratch
+tests/
+test_output/
+*_test.py
+test_*.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
