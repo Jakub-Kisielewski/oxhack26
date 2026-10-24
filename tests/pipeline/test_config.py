@@ -24,3 +24,11 @@ def test_env_overrides():
 def test_bad_route_points_rejected():
     with pytest.raises(ValueError):
         parse_route_points("51.5,-0.1,7")
+    with pytest.raises(ValueError):
+        parse_route_points("51.5,-0.1")  # a line needs two points
+
+
+def test_route_lines_wraps_route_points():
+    s = load_settings({"ROUTE_POINTS": "51.5,-0.1;51.6,-0.2", "ROUTE_BUFFER_M": "150"})
+    assert s.route_lines == (((51.5, -0.1), (51.6, -0.2)),)
+    assert s.route_buffer_m == 150.0

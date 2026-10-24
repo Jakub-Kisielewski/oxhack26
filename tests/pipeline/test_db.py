@@ -243,13 +243,31 @@ def test_queue_stats(con):
     a = db.enqueue_clip(con, "A", T0, b"x")
     db.enqueue_clip(con, "B", T0, b"y")
     db.claim_next(con, now=T0)
-    db.mark_done(con, a, now=T0 + timedelta(seconds=4))
-    db.insert_observation(con, _obs("A", T0 - timedelta(seconds=30), 2), now=T0 + timedelta(seconds=4))
+    db.mark_done(con, a, now=T0 + timedelta(seconds=9))  # whole-second timestamps are not used for timing
+    db.insert_observation(con, _obs("A", T0 - timedelta(seconds=30), 2, proc_ms=3500), now=T0 + timedelta(seconds=4))
+    db.insert_observation(con, _obs("C", T0 - timedelta(seconds=40), 2, proc_ms=4500), now=T0 + timedelta(seconds=4))
     s = db.queue_stats(con, now=T0 + timedelta(seconds=60))
     assert s["by_status"] == {"pending": 1, "processing": 0, "done": 1, "failed": 0}
-    assert s["observations_recent"] == 1
+    assert s["observations_recent"] == 2
     assert s["mean_seconds_per_chunk"] == pytest.approx(4.0)
     assert s["lag_seconds"] == pytest.approx(90.0)
+
+
+def test_init_db_adds_proc_ms_to_an_existing_db(db_url):
+    old = db.connect(db_url)
+    old.execute("CREATE TABLE observations (camera_id TEXT NOT NULL, frame_time TEXT NOT NULL, "
+                "chunk_index INTEGER NOT NULL DEFAULT 0, kind TEXT NOT NULL DEFAULT 'clip', ingested_at TEXT NOT NULL, "
+                "people REAL, UNIQUE (camera_id, frame_time, chunk_index, kind))")
+    db.init_db(old)
+    db.init_db(old)  # idempotent
+    assert "proc_ms" in {r["name"] for r in old.execute("PRAGMA table_info(observations)")}
+    old.close()
+
+
+def test_all_cameras_includes_inactive(con):
+    db.upsert_cameras(con, [_cam("A"), _cam("B", active=False)])
+    assert {(c["camera_id"], c["active"]) for c in db.all_cameras(con)} == {("A", 1), ("B", 0)}
+    assert db.camera_tiers(con) == {"A": 2, "B": 2}
 
 
 def test_queue_stats_empty(con):

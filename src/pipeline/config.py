@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
-from src.pipeline.jamcam_poller import DEFAULT_BBOX
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# JAMCAM.md DEFAULT_BBOX (lat_min, lon_min, lat_max, lon_max). Defined here rather than imported from
+# jamcam_poller so that the UI, which imports db -> config, never imports poller code.
+DEFAULT_CENTRAL_BBOX = (51.495, -0.180, 51.530, -0.070)
 
 # Example march route from JAMCAM.md: Russell Sq -> Kingsway -> Aldwych -> Trafalgar Sq -> Whitehall
 DEFAULT_ROUTE_POINTS = (
@@ -23,8 +25,8 @@ def _floats(text: str) -> tuple[float, ...]:
 def parse_route_points(text: str) -> tuple[tuple[float, float], ...]:
     """'lat,lon;lat,lon;...' -> ((lat, lon), ...)."""
     points = tuple(_floats(p) for p in text.split(";") if p.strip())
-    if any(len(p) != 2 for p in points):
-        raise ValueError(f"ROUTE_POINTS must be 'lat,lon;lat,lon;...', got {text!r}")
+    if len(points) < 2 or any(len(p) != 2 for p in points):
+        raise ValueError(f"ROUTE_POINTS must be at least two 'lat,lon' points separated by ';', got {text!r}")
     return points  # type: ignore[return-value]
 
 
@@ -37,10 +39,12 @@ class Settings:
     db_url: str = "sqlite:///data/pipeline.db"
     # camera registry
     route_points: tuple[tuple[float, float], ...] = DEFAULT_ROUTE_POINTS
-    radius_m: float = 300.0
-    central_bbox: tuple[float, float, float, float] = DEFAULT_BBOX
+    route_buffer_m: float = 300.0
+    central_bbox: tuple[float, float, float, float] = DEFAULT_CENTRAL_BBOX
     camera_refresh_seconds: int = 600
-    camera_overrides_path: str = "data/camera_overrides.json"  # {camera_id: tier}; relative to the repo root
+    # {camera_id: tier}, relative to the repo root: shared (committed) file, then a local file that wins
+    camera_overrides_path: str = "config/camera_overrides.json"
+    local_camera_overrides_path: str = "data/camera_overrides.json"
     # poller
     poll_seconds: int = 15
     still_poll_seconds: int = 60
@@ -61,14 +65,20 @@ class Settings:
     lag_seconds: int = 45
     twin_tick_seconds: int = 15
 
+    @property
+    def route_lines(self) -> tuple[tuple[tuple[float, float], ...], ...]:
+        """Route polylines that define tier 2. One line for now; Step 9 adds the top alternatives."""
+        return (self.route_points,)
+
 
 _PARSERS = {
     "DB_URL": ("db_url", str),
     "ROUTE_POINTS": ("route_points", parse_route_points),
-    "RADIUS_M": ("radius_m", float),
+    "ROUTE_BUFFER_M": ("route_buffer_m", float),
     "CENTRAL_BBOX": ("central_bbox", _floats),
     "CAMERA_REFRESH_SECONDS": ("camera_refresh_seconds", int),
     "CAMERA_OVERRIDES_PATH": ("camera_overrides_path", str),
+    "LOCAL_CAMERA_OVERRIDES_PATH": ("local_camera_overrides_path", str),
     "POLL_SECONDS": ("poll_seconds", int),
     "STILL_POLL_SECONDS": ("still_poll_seconds", int),
     "TIER1_ENABLED": ("tier1_enabled", _bool),

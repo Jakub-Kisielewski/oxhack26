@@ -23,9 +23,16 @@
   (`data/pipeline.db`), with SQL kept in `src/pipeline/db.py` so Postgres can be added later.
 - **Camera registry (Step 2):** no `--mode route|bbox`. One run, `python -m src.pipeline.cameras [--list]`,
   registers every TfL camera inside `src/pipeline/zones_1_2.geojson` (an approximate boundary: zone 1–2 station hull
-  + 500 m) and assigns tiers (route via `cameras_along_route`, then `CENTRAL_BBOX`, else 0). Refresh never deletes:
-  missing or `available=false` cameras get `active=0` and return to 1 when back. Manual tiers in
-  `data/camera_overrides.json` (`{camera_id: tier}`, local and gitignored) win over computed tiers on every refresh.
+  + 500 m) and assigns tiers. Tier 2 = within `ROUTE_BUFFER_M` (300) of the route *line*: `ROUTE_POINTS` as a
+  polyline, distance to the nearest segment in EPSG:27700 metres. It accepts several lines (Step 9 adds the top
+  alternatives); Step 7 replaces the straight segments with OSM street paths. `cameras_along_route` (point radius)
+  is no longer used. Tier 1 = `CENTRAL_BBOX`, else 0. Refresh never deletes: missing or `available=false`
+  cameras get `active=0` and return to 1 when back. Manual tiers `{camera_id: tier}`: `config/camera_overrides.json`
+  (committed, shared) then `data/camera_overrides.json` (local, optional), local wins; both win over computed tiers.
+- **Processing time:** `observations.proc_ms` (worker `perf_counter` around `extract_features`) drives seconds per
+  chunk in `queue_stats`, not the whole-second timestamps. `init_db` adds new columns to existing DB files.
+- **UI imports:** `config.py` defines the central bbox itself instead of importing `jamcam_poller`, so the UI
+  (which imports `db` → `config`) never imports poller code (JAMCAM.md invariant 4).
 - **Tests:** `.gitignore` no longer ignores `tests/`, `test_*.py`, `*_test.py`.
 - **Reference poller:** `jamcam_poller.py` lives at `src/pipeline/jamcam_poller.py` (logic unchanged; CLI is
   `python -m src.pipeline.jamcam_poller --list`). Other modules import its functions from there.

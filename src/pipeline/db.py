@@ -7,7 +7,6 @@ Every stored time goes through to_iso (UTC 'YYYY-MM-DDTHH:MM:SS+00:00'), so time
 from __future__ import annotations
 
 import sqlite3
-import statistics
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -50,6 +49,7 @@ CREATE TABLE IF NOT EXISTS observations (
   speed REAL, heading REAL,                 -- m/s, degrees from north; NULL if no flow
   quality TEXT,                             -- ok | blank | dark | reaimed | stale
   proc_version TEXT,
+  proc_ms INTEGER,                          -- extract_features wall time (perf_counter) in the worker
   UNIQUE (camera_id, frame_time, chunk_index, kind)
 );
 CREATE INDEX IF NOT EXISTS idx_obs_frame_time ON observations (frame_time);
@@ -76,10 +76,13 @@ CREATE VIEW IF NOT EXISTS latest_police_posts AS
   SELECT * FROM police_posts WHERE run_id = (SELECT MAX(run_id) FROM model_runs);
 """
 
+# Columns added after a table was first created: init_db adds them to existing DB files.
+ADDED_COLUMNS = {"observations": {"proc_ms": "INTEGER"}}
+
 CAMERA_COLUMNS = ("camera_id", "name", "lat", "lon", "view", "image_url", "video_url", "tier")
 OBSERVATION_COLUMNS = (
     "camera_id", "frame_time", "chunk_index", "kind", "ingested_at", "lat", "lon", "h3",
-    "people", "density", "speed", "heading", "quality", "proc_version",
+    "people", "density", "speed", "heading", "quality", "proc_version", "proc_ms",
 )
 STATUSES = ("pending", "processing", "done", "failed")
 
@@ -144,7 +147,13 @@ def _tx(con: sqlite3.Connection, immediate: bool = False) -> Iterator[sqlite3.Co
 
 
 def init_db(con: sqlite3.Connection) -> None:
+    """Create missing tables and views, and add columns introduced since the DB file was created."""
     con.executescript(SCHEMA)
+    for table, columns in ADDED_COLUMNS.items():
+        have = {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}
+        for name, decl in columns.items():
+            if name not in have:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
 
 
 # ------------------------------------------------------------------- cameras
@@ -178,6 +187,21 @@ def upsert_cameras(con: sqlite3.Connection, cameras: Iterable[Mapping[str, Any]]
                 (ts, *(r[0] for r in rows)),
             )
     return len(rows)
+
+
+def all_cameras(con: sqlite3.Connection) -> list[dict[str, Any]]:
+    """Every registered camera, active or not (for the map)."""
+    rows = con.execute(
+        """SELECT camera_id, name, lat, lon, view, image_url, video_url, tier, active,
+                  homography IS NOT NULL AS calibrated, updated_at
+           FROM cameras ORDER BY camera_id"""
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def camera_tiers(con: sqlite3.Connection) -> dict[str, int]:
+    """{camera_id: tier} for every registered camera."""
+    return {r["camera_id"]: r["tier"] for r in con.execute("SELECT camera_id, tier FROM cameras")}
 
 
 def camera_tier_summary(con: sqlite3.Connection) -> list[dict[str, Any]]:
@@ -313,18 +337,14 @@ def queue_stats(con: sqlite3.Connection, window_minutes: int = 10,
     by_status = dict.fromkeys(STATUSES, 0)
     by_status.update({r["status"]: r["n"] for r in
                       con.execute("SELECT status, COUNT(*) AS n FROM clips GROUP BY status")})
-    recent_obs = con.execute("SELECT COUNT(*) FROM observations WHERE ingested_at >= ?", (cutoff,)).fetchone()[0]
-    durations = [
-        (datetime.fromisoformat(r["finished_at"]) - datetime.fromisoformat(r["claimed_at"])).total_seconds()
-        for r in con.execute(
-            "SELECT claimed_at, finished_at FROM clips WHERE status = 'done' AND finished_at >= ?", (cutoff,))
-    ]
+    recent_obs, mean_ms = con.execute(
+        "SELECT COUNT(*), AVG(proc_ms) FROM observations WHERE ingested_at >= ?", (cutoff,)).fetchone()
     newest = con.execute("SELECT MAX(frame_time) FROM observations").fetchone()[0]
     return {
         "by_status": by_status,
         "observations_recent": recent_obs,
         "window_minutes": window_minutes,
-        "mean_seconds_per_chunk": statistics.fmean(durations) if durations else None,
+        "mean_seconds_per_chunk": mean_ms / 1000 if mean_ms is not None else None,  # from proc_ms
         "newest_frame_time": newest,
         "lag_seconds": (now - datetime.fromisoformat(newest)).total_seconds() if newest else None,
     }
