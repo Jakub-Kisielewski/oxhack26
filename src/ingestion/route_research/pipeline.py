@@ -22,7 +22,11 @@ PROJECT_ROOT = HERE.parents[2]  # oxhack26-main/
 DEFAULT_WORKSPACE = PROJECT_ROOT / 'data' / 'route_research'
 
 STEPS: dict[str, tuple[str, list[str]]] = {
+    'boundary': ('sources/download_boundary.py', []),
     'osm': ('sources/download_osm.py', []),
+    'landmarks': ('sources/download_landmarks.py', []),
+    'weather': ('sources/download_weather.py', []),
+    'pageviews': ('sources/download_pageviews.py', []),
     'police': ('sources/download_police.py', []),
     'tfl': ('sources/download_tfl.py', []),
     'acled': ('sources/download_acled.py', []),
@@ -33,6 +37,7 @@ STEPS: dict[str, tuple[str, list[str]]] = {
     'next-street': ('processing/next_street_demo.py', []),
     'sample-ghsl': ('processing/sample_ghsl.py', []),
     'export-parquet': ('processing/export_parquet.py', []),
+    'event-context': ('processing/event_context.py', []),
     'legacy-geocode': ('legacy_tools/geocode_and_route.py', ['geocode', '--waypoints', 'seed/waypoints.csv']),
     'legacy-route': ('legacy_tools/geocode_and_route.py', ['build', '--waypoints', 'seed/waypoints.csv']),
     'legacy-acled-import': ('legacy_tools/acled_london_import.py', []),
@@ -46,7 +51,8 @@ def initialise_workspace(target: Path) -> None:
         dest = target / 'seed' / source.name
         if not dest.exists():
             shutil.copy2(source, dest)
-    for d in ['raw/osm','raw/police','raw/tfl','raw/acled','raw/ghsl','normalised']:
+    for d in ['raw/boundary','raw/osm','raw/landmarks','raw/police','raw/tfl','raw/acled','raw/ghsl',
+              'raw/weather','raw/pageviews','raw/calendar','normalised']:
         (target / d).mkdir(parents=True, exist_ok=True)
 
 def main(argv: list[str] | None = None) -> int:

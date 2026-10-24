@@ -65,6 +65,26 @@ python -m src.ingestion.route_research.pipeline normalize
 python -m src.ingestion.route_research.pipeline export-parquet
 ```
 
+### Zones 1-2 area, landmarks and per-event context
+
+```bash
+# Area of interest first: osm and landmarks clip to it
+python -m src.ingestion.route_research.pipeline boundary
+python -m src.ingestion.route_research.pipeline osm
+python -m src.ingestion.route_research.pipeline landmarks
+
+# Per-event features (weather and pageviews cover every event_date in seed/events.csv)
+python -m src.ingestion.route_research.pipeline weather
+python -m src.ingestion.route_research.pipeline pageviews
+python -m src.ingestion.route_research.pipeline event-context
+```
+
+Salience features need a `cause` column in `seed/events.csv` whose values
+match the `cause` keys in `seed/cause_articles.csv` (e.g. `palestine`,
+`far_right`, `climate_nature`). Until it exists, those columns stay empty.
+`seed/school_holidays.csv` is an empty template: fill in
+`start_date,end_date,name` rows to get `is_school_holiday`.
+
 ### Optional contextual datasets
 
 ```bash
@@ -91,7 +111,12 @@ python -m src.ingestion.route_research.pipeline next-street --lat 51.508 --lon -
 
 | CLI step | Script | Files written under `data/route_research/` | Format and granularity |
 |---|---|---|---|
-| `osm` | `sources/download_osm.py` | `raw/osm/london_walk.graphml`, `raw/osm/london_edges.geojson` | Directed walk graph and one GeoJSON feature per directed segment |
+| `boundary` | `sources/download_boundary.py` | `raw/boundary/zones_1_2.geojson`, `raw/boundary/zone_stations.csv` | One polygon: concave hull of TfL zone 1-2 stations, buffered 300 m |
+| `osm` | `sources/download_osm.py` | `raw/osm/london_walk.graphml`, `raw/osm/london_edges.geojson`, `raw/osm/london_main.graphml`, `raw/osm/london_main_edges.geojson` | Directed walk graph clipped to the boundary (with lanes/width/bridge tags), plus a main-roads-only graph |
+| `landmarks` | `sources/download_landmarks.py` | `raw/landmarks/{targets,open_spaces,shops,warehouses,missions_wikidata}.{geoparquet,csv}` | One OSM feature per row with category, area_m2, centroid lat/lon; embassies carry `mission_country` |
+| `weather` | `sources/download_weather.py` | `raw/weather/hourly.csv` | Hourly Open-Meteo values around each event date; `source` = archive or forecast |
+| `pageviews` | `sources/download_pageviews.py` | `raw/pageviews/daily.csv` | Daily Wikipedia views per cause article |
+| `event-context` | `processing/event_context.py` | `normalised/event_context.csv`, `raw/calendar/bank_holidays.json` | One row per event: calendar, Ramadan, daylight, 4 h weather window, pre-event salience |
 | `police` | `sources/download_police.py` | `raw/police/police_public_order_context.csv` | One **monthly** anonymized public order record per row |
 | `tfl` | `sources/download_tfl.py` | `raw/tfl/roads_*.json`, `raw/tfl/tube_*.json` | Timestamped JSON envelopes, full road disruptions/tube status snapshot |
 | `acled` | `sources/download_acled.py` | `raw/acled/london_protest_events.csv` | One ACLED **event point** per row; no trajectories |
