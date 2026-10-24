@@ -1,21 +1,30 @@
+# London Protest Predictor
+
 ## HOW TO SETUP
-### Run the following in order of appearance
+
+Run these steps in order from the repo root. Steps 1 and 2 are one-off.
+
+| Step | Command | How often |
+|---|---|---|
+| 1. Python environment | `python3.12 -m venv .venv`, activate, `pip install -r requirements.txt` | once |
+| 2. DuckDB spatial extension | manual download, see below | once per machine |
+| 3. Optional credentials | `export ACLED_EMAIL=... ACLED_PASSWORD=... TFL_APP_KEY=...` | if you want those sources |
+| 4. All ingestion | `python ingest.py` | whenever you want fresh data |
+| 5. App | `streamlit run app.py` | |
+
+### 1. Python environment
+The repo pins Python 3.12 (`.python-version`).
+
 ```bash
-# Create virtual environment
-python -m venv .venv
-
-# Activate it
+python3.12 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### To setup the database
-DuckDB runs inside Python, so there is no server to install. The only slow part is the **spatial extension** (~35 MB), which DuckDB downloads silently with no progress bar. On a slow network it looks frozen for 10+ minutes and ignores Ctrl+C, so please follow the steps below rather than just running the script.
+### 2. DuckDB spatial extension
+DuckDB runs inside Python, so there is no server to install. The only slow part is the **spatial extension** (~35 MB), which DuckDB downloads silently with no progress bar. On a slow network it looks frozen for 10+ minutes and ignores Ctrl+C, so install it manually **before** running `ingest.py` (its last step creates the database and would otherwise trigger the download).
 `requirements.txt` pins `duckdb==2.0.0`. Extensions are tied to the exact DuckDB version, so don't upgrade it.
 
-#### install spatial extension
 ```bash
 python -c "import duckdb; print(duckdb.__version__)"            # should print 2.0.0
 python -c "import duckdb; print(duckdb.sql('PRAGMA platform').fetchone()[0])"
@@ -44,34 +53,56 @@ Verify that it loads:
 ```bash
 python -c "import duckdb; c=duckdb.connect(); c.sql('LOAD spatial'); print(c.sql('SELECT ST_Point(0,0)'))"
 ```
-#### create the db
-From the repo root:
 
+### 3. Optional credentials
 ```bash
-python -m src.database.db
+export ACLED_EMAIL='...' ACLED_PASSWORD='...'   # ACLED step is skipped without these (or use --acled-file)
+export TFL_APP_KEY='...'                          # optional, raises TfL rate limits
+```
+Never commit credentials.
+
+### 4. Ingestion: one command
+```bash
+python ingest.py
 ```
 
-This should finish in under a second and print the tables: `crimes`, `grid_cells`, `transit_snapshots`. It creates `data/protest.duckdb`. It's safe to re-run.
+This runs every step in dependency order:
 
-#### Load data
+| Step | What it does | Output |
+|---|---|---|
+| `boundary` | Zones 1-2 polygon from TfL station zones | `data/route_research/raw/boundary/` |
+| `osm` | OSM walk network + main-road network inside the boundary | `data/route_research/raw/osm/` |
+| `landmarks` | Protest targets, squares/parks (capacity), shops, warehouses, embassies with country | `data/route_research/raw/landmarks/` |
+| `police` | Public-order crimes for the months of the seed events | `data/route_research/raw/police/` |
+| `tfl` | Snapshot of current TfL road disruptions and tube status | `data/route_research/raw/tfl/` |
+| `acled` | ACLED London protest events (only with credentials) | `data/route_research/raw/acled/` |
+| `seed-coords` | Waypoint coordinates from the reviewed geocode cache | `data/route_research/coordinate_review.csv` |
+| `normalize` | Street segments, route labels, context tables | `data/route_research/normalised/` |
+| `export-parquet` | Parquet/GeoParquet copies of the normalised tables | `data/route_research/normalised/parquet/` |
+| `weather` | Hourly Open-Meteo weather around each event date | `data/route_research/raw/weather/` |
+| `pageviews` | Daily Wikipedia views per protest cause | `data/route_research/raw/pageviews/` |
+| `event-context` | Per-event calendar, daylight, weather, media salience features | `data/route_research/normalised/event_context.csv` |
+| `crawl` | Tier 1 crawlers (Met Police, OSAC, TfL, Marble Arch, organiser sites) | `data/runs/<run_id>/` |
+| `database` | Creates the DuckDB schema | `data/protest.duckdb` |
 
-One command runs every ingestion step in the right order:
+Useful options:
 
 ```bash
-python ingest.py              # everything
-python ingest.py --list       # see the steps and their dependencies
-python ingest.py --only weather event-context
-python ingest.py --skip crawl
-python ingest.py --refresh    # re-download cached map data (boundary, osm, landmarks, police)
+python ingest.py --list                       # steps and their dependencies
+python ingest.py --only weather event-context # run just these
+python ingest.py --skip crawl acled           # leave these out
+python ingest.py --refresh                    # re-download cached data (boundary, osm, landmarks, police)
+python ingest.py --refresh osm                # re-download just one of them
+python ingest.py --acled-file path/to/export.csv
 ```
 
-Route and context data goes to `data/route_research/`, crawler runs to `data/runs/`.
-If a step fails, the steps that depend on it are skipped, the others still run,
-and a summary is printed at the end. ACLED only runs when `ACLED_EMAIL` and
-`ACLED_PASSWORD` are set (or with `--acled-file path/to/export.csv`).
-See `src/ingestion/route_research/README.md` for what each step writes.
+- The first run is slow: the OSM network and landmarks for zones 1-2 take several minutes each, and the crawler visits about 15 sites. Later runs skip downloads whose files already exist.
+- If a step fails, the steps that depend on it are skipped, the rest still run, and a summary is printed at the end. Re-run a failed step with `--only <step>`.
+- Every step can also be run on its own, see `src/ingestion/route_research/README.md`.
 
-### Run the app
+> **Current status:** ingestion writes files under `data/route_research/` and `data/runs/`, and the `database` step only creates empty tables. Loading those files into DuckDB, and the UI reading from it, are not built yet.
+
+### 5. Run the app
 ```bash
 streamlit run app.py
 ```
@@ -122,6 +153,19 @@ The `src/ingestion/route_research/` pipeline downloads additional geographic, hi
   Usage policy: https://operations.osmfoundation.org/policies/nominatim/
 
 - **Copernicus GHSL — Satellite-derived urban population and built-up-area datasets:** https://human-settlement.emergency.copernicus.eu/downloadWizard.php
+
+- **TfL Unified API — Station fare zones (for the Zones 1-2 boundary):** https://api.tfl.gov.uk/StopPoint/Mode/tube,dlr,overground,elizabeth-line
+
+- **OpenStreetMap Overpass (via OSMnx) — Embassies, government buildings, landmarks, squares, parks, shops, warehouses:** https://overpass-api.de/
+
+- **Wikidata SPARQL — Diplomatic missions in London and the country that runs them:** https://query.wikidata.org/
+
+- **Open-Meteo — Historical and forecast hourly weather (no key):** https://open-meteo.com/en/docs/historical-weather-api
+
+- **Wikimedia Pageviews API — Daily Wikipedia views per protest cause (media salience):** https://wikimedia.org/api/rest_v1/  
+  Documentation: https://doc.wikimedia.org/generated-data-platform/aqs/analytics-api/
+
+- **GOV.UK — UK bank holidays:** https://www.gov.uk/bank-holidays.json
 
 These sources provide street geometry, protest-event locations, transport conditions and urban characteristics. They do not directly provide historical sequences of crowd movement.
 
@@ -199,11 +243,11 @@ Sources may change or become unavailable over time. Their reuse and redistributi
 
 ## Protest ingestion
 
-From the repo root (use `.venv`, not conda `base`):
+This crawler runs as the `crawl` step of `python ingest.py`. To run it on its own from the repo root (use `.venv`, not conda `base`):
 
 ```bash
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-python -m src.ingestion
+python ingest.py --only crawl   # or: python -m src.ingestion
 ```
 
 Ingest Met Police conditions posts, OSAC London demonstration alerts, TfL road disruptions, and organizer sites. List platform IDs with `python -m src.ingestion --list-platforms`.
