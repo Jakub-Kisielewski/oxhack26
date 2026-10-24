@@ -24,6 +24,9 @@ cloudscraper>=1.2.71
 protobuf>=4.25.3
 gtfs-realtime-bindings>=0.0.7
 
+# --- JamCam pipeline (src/pipeline) ---
+opencv-python-headless>=4.10
+
 
 
 

@@ -38,3 +38,17 @@ Tier 2 load: 7 cameras × 1 clip per ~5 min ≈ 1.4 clips/min.
 ## HEAD latency (115 tier-1 + tier-2 cameras, sequential)
 
 Median 79 ms, p95 207 ms, 11.5 s in total for one sequential pass. 2 of the 115 clips were stale (> 900 s).
+
+## DuckDB spatial extension (needed by `app.py` bootstrap)
+
+Installed with the README's manual steps (`bootstrap()` unchanged). On duckdb 2.0.0 the README's platform
+check fails (`Relations no longer have fetchone()`); use the connection form instead:
+
+```bash
+python -c "import duckdb; print(duckdb.connect().execute('PRAGMA platform').fetchone()[0])"   # osx_arm64
+curl -fL -C - -o spatial.duckdb_extension.gz \
+  https://extensions.duckdb.org/v2.0.0/osx_arm64/spatial.duckdb_extension.gz   # ~80 MB unpacked
+gunzip spatial.duckdb_extension.gz
+python -c "import duckdb; duckdb.sql(\"INSTALL './spatial.duckdb_extension'\"); print('ok')"
+python -m src.database.db   # [('crimes',), ('grid_cells',), ('transit_snapshots',)]
+```
