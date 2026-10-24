@@ -42,10 +42,7 @@ implementation_plan.md
 progression_log.md
 
 # Test / scratch
-tests/
 test_output/
-*_test.py
-test_*.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
