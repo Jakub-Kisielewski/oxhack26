@@ -33,6 +33,8 @@
   chunk in `queue_stats`, not the whole-second timestamps. `init_db` adds new columns to existing DB files.
 - **UI imports:** `config.py` defines the central bbox itself instead of importing `jamcam_poller`, so the UI
   (which imports `db` → `config`) never imports poller code (JAMCAM.md invariant 4).
+- **Step 6 is split:** 6a (camera layer by tier + live viewer, page `src/ui/live_map.py`, data in
+  `src/ui/live_data.py`) is built before Step 3; Step 6 adds count colouring, the history chart and sidebar stats.
 - **Tests:** `.gitignore` no longer ignores `tests/`, `test_*.py`, `*_test.py`.
 - **Reference poller:** `jamcam_poller.py` lives at `src/pipeline/jamcam_poller.py` (logic unchanged; CLI is
   `python -m src.pipeline.jamcam_poller --list`). Other modules import its functions from there.

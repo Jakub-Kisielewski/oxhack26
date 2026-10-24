@@ -29,5 +29,6 @@ bootstrap()
 pages = [
     st.Page("src/ui/home.py",     title="Dashboard",       icon="📊", default=True),
     st.Page("src/ui/map_view.py", title="Zones 1 & 2 Map", icon="🗺️"),
+    st.Page("src/ui/live_map.py", title="Live Cameras",    icon="📷"),
 ]
 st.navigation(pages).run()
