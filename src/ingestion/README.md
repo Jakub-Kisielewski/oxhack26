@@ -8,7 +8,7 @@ From repo root:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements-crawler.txt
+pip install -r requirements.txt
 python run_test_pipeline.py
 ```
 
