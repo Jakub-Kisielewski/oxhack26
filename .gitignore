@@ -267,3 +267,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 spatial.duckdb_extension*
+# streamlit agent skills
+.agents/skills/developing-with-streamlit
