@@ -253,3 +253,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+spatial.duckdb_extension*
