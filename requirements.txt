@@ -1,0 +1,24 @@
+# --- Frontend & UI ---
+streamlit==1.32.0
+pydeck==0.8.1
+folium==0.16.0
+streamlit-folium==0.18.0
+
+# --- Data Storage & Spatial Engine ---
+duckdb==0.10.1
+pyarrow==15.0.2
+geopandas==0.14.3
+shapely==2.0.3
+
+# --- Mathematical Modeling (Spatial & Temporal) ---
+tick==0.7.3
+libpysal==4.10.0
+esda==2.5.1
+scikit-learn==1.4.1post1
+numpy==1.26.4
+pandas==2.2.1
+
+# --- Data Ingestion & APIs ---
+requests==2.31.0
+protobuf==4.25.3
+gtfs-realtime-bindings==0.0.7
