@@ -1,0 +1,286 @@
+﻿event_id,event_date,sequence_index,waypoint_name,event_category,route_detail,evidence_type,source_url
+2022-06-18-tuc,2022-06-18,0,Portland Place,protest,detailed,organizer_pre_event_notice,https://www.tuc.org.uk/march-route
+2022-06-18-tuc,2022-06-18,1,Regent Street,protest,detailed,organizer_pre_event_notice,https://www.tuc.org.uk/march-route
+2022-06-18-tuc,2022-06-18,2,Haymarket,protest,detailed,organizer_pre_event_notice,https://www.tuc.org.uk/march-route
+2022-06-18-tuc,2022-06-18,3,Trafalgar Square,protest,detailed,organizer_pre_event_notice,https://www.tuc.org.uk/march-route
+2022-06-18-tuc,2022-06-18,4,Whitehall,protest,detailed,organizer_pre_event_notice,https://www.tuc.org.uk/march-route
+2022-06-18-tuc,2022-06-18,5,Parliament Square,protest,detailed,organizer_pre_event_notice,https://www.tuc.org.uk/march-route
+2023-10-21-psc,2023-10-21,0,Marble Arch,protest,detailed,met_primary,https://news.met.police.uk/news/update-met-response-to-terror-attacks-in-israel-and-ongoing-military-action-in-gaza-474080
+2023-10-21-psc,2023-10-21,1,Park Lane,protest,detailed,met_primary,https://news.met.police.uk/news/update-met-response-to-terror-attacks-in-israel-and-ongoing-military-action-in-gaza-474080
+2023-10-21-psc,2023-10-21,2,Hyde Park Corner,protest,detailed,met_primary,https://news.met.police.uk/news/update-met-response-to-terror-attacks-in-israel-and-ongoing-military-action-in-gaza-474080
+2023-10-21-psc,2023-10-21,3,Piccadilly,protest,detailed,met_primary,https://news.met.police.uk/news/update-met-response-to-terror-attacks-in-israel-and-ongoing-military-action-in-gaza-474080
+2023-10-21-psc,2023-10-21,4,Trafalgar Square,protest,detailed,met_primary,https://news.met.police.uk/news/update-met-response-to-terror-attacks-in-israel-and-ongoing-military-action-in-gaza-474080
+2023-10-21-psc,2023-10-21,5,Whitehall,protest,detailed,met_primary,https://news.met.police.uk/news/update-met-response-to-terror-attacks-in-israel-and-ongoing-military-action-in-gaza-474080
+2023-11-11-psc,2023-11-11,0,Park Lane,protest,partial,organizer_pre_event_notice,https://palestinecampaign.org/statement-on-the-march-on-saturday-11-november/
+2023-11-11-psc,2023-11-11,1,Victoria,protest,partial,organizer_pre_event_notice,https://palestinecampaign.org/statement-on-the-march-on-saturday-11-november/
+2023-11-11-psc,2023-11-11,2,Vauxhall Bridge,protest,partial,organizer_pre_event_notice,https://palestinecampaign.org/statement-on-the-march-on-saturday-11-november/
+2023-11-11-psc,2023-11-11,3,US Embassy Nine Elms,protest,partial,organizer_pre_event_notice,https://palestinecampaign.org/statement-on-the-march-on-saturday-11-november/
+2023-11-11-psc,2023-11-11,4,Nine Elms Lane,protest,partial,organizer_pre_event_notice,https://palestinecampaign.org/statement-on-the-march-on-saturday-11-november/
+2024-01-13-012,2024-01-13,0,Queen Victoria Street,protest,partial,news_post_event_report,https://londonnewsonline.org.uk/news/thousands-of-protesters-turn-out-in-support-of-gaza/
+2024-01-13-012,2024-01-13,1,Fleet Street,protest,partial,news_post_event_report,https://londonnewsonline.org.uk/news/thousands-of-protesters-turn-out-in-support-of-gaza/
+2024-01-13-012,2024-01-13,2,Parliament Square,protest,partial,news_post_event_report,https://londonnewsonline.org.uk/news/thousands-of-protesters-turn-out-in-support-of-gaza/
+2024-02-03-psc,2024-02-03,0,Portland Place,protest,detailed,news_pre_event_report,https://www.itv.com/news/london/2024-02-02/police-increase-patrols-for-palestine-solidarity-campaign-in-london
+2024-02-03-psc,2024-02-03,1,Regent Street,protest,detailed,news_pre_event_report,https://www.itv.com/news/london/2024-02-02/police-increase-patrols-for-palestine-solidarity-campaign-in-london
+2024-02-03-psc,2024-02-03,2,Haymarket,protest,detailed,news_pre_event_report,https://www.itv.com/news/london/2024-02-02/police-increase-patrols-for-palestine-solidarity-campaign-in-london
+2024-02-03-psc,2024-02-03,3,Trafalgar Square,protest,detailed,news_pre_event_report,https://www.itv.com/news/london/2024-02-02/police-increase-patrols-for-palestine-solidarity-campaign-in-london
+2024-02-03-psc,2024-02-03,4,Whitehall,protest,detailed,news_pre_event_report,https://www.itv.com/news/london/2024-02-02/police-increase-patrols-for-palestine-solidarity-campaign-in-london
+2024-02-17-psc,2024-02-17,0,Marble Arch,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-march-for-palestine-stop-the-genocide/
+2024-02-17-psc,2024-02-17,1,Israeli Embassy Kensington,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-march-for-palestine-stop-the-genocide/
+2024-03-09-013,2024-03-09,0,Hyde Park Corner,protest,endpoints_only,organizer_pre_event_notice,https://www.pcs.org.uk/print/pdf/node/11861
+2024-03-09-013,2024-03-09,1,US Embassy Nine Elms,protest,endpoints_only,organizer_pre_event_notice,https://www.pcs.org.uk/print/pdf/node/11861
+2024-03-30-psc,2024-03-30,0,Russell Square,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-demonstration-ceasefire-now-stop-the-genocide-in-gaza-2/
+2024-03-30-psc,2024-03-30,1,Trafalgar Square,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-demonstration-ceasefire-now-stop-the-genocide-in-gaza-2/
+2024-05-18-psc,2024-05-18,0,BBC Portland Place,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/palestine-coalition-joins-the-global-day-of-action-for-gaza-on-76th-nakba-anniversary/
+2024-05-18-psc,2024-05-18,1,Whitehall,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/palestine-coalition-joins-the-global-day-of-action-for-gaza-on-76th-nakba-anniversary/
+2024-06-08-psc,2024-06-08,0,Russell Square,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-march-for-gaza-end-the-genocide-stop-arming-israel/
+2024-06-08-psc,2024-06-08,1,Whitehall,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-march-for-gaza-end-the-genocide-stop-arming-israel/
+2024-06-22-restore,2024-06-22,0,Park Lane,protest,detailed,organizer_pre_event_notice,https://www.restorenaturenow.com/the-march
+2024-06-22-restore,2024-06-22,1,Piccadilly,protest,detailed,organizer_pre_event_notice,https://www.restorenaturenow.com/the-march
+2024-06-22-restore,2024-06-22,2,Trafalgar Square,protest,detailed,organizer_pre_event_notice,https://www.restorenaturenow.com/the-march
+2024-06-22-restore,2024-06-22,3,Whitehall,protest,detailed,organizer_pre_event_notice,https://www.restorenaturenow.com/the-march
+2024-06-22-restore,2024-06-22,4,Parliament Square,protest,detailed,organizer_pre_event_notice,https://www.restorenaturenow.com/the-march
+2024-10-05-psc,2024-10-05,0,Russell Square,protest,partial,met_primary,https://news.met.police.uk/news/policing-operation-for-weekend-ahead-of-october-7th-anniversary-488935
+2024-10-05-psc,2024-10-05,1,Aldwych,protest,partial,met_primary,https://news.met.police.uk/news/policing-operation-for-weekend-ahead-of-october-7th-anniversary-488935
+2024-10-05-psc,2024-10-05,2,Whitehall,protest,partial,met_primary,https://news.met.police.uk/news/policing-operation-for-weekend-ahead-of-october-7th-anniversary-488935
+2024-10-26-sutr,2024-10-26,0,Regent Street St James’s,protest,endpoints_only,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-saturday-protests-489744
+2024-10-26-sutr,2024-10-26,1,northern end of Whitehall,protest,endpoints_only,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-saturday-protests-489744
+2024-10-26-utk,2024-10-26,0,Victoria Station,protest,endpoints_only,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-saturday-protests-489744
+2024-10-26-utk,2024-10-26,1,southern end of Whitehall,protest,endpoints_only,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-saturday-protests-489744
+2024-11-02-psc,2024-11-02,0,Whitehall,protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plan-ahead-of-a-busy-weekend-of-events-in-london-489967
+2024-11-02-psc,2024-11-02,1,Vauxhall Bridge,protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plan-ahead-of-a-busy-weekend-of-events-in-london-489967
+2024-11-02-psc,2024-11-02,2,Nine Elms (US Embassy area),protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plan-ahead-of-a-busy-weekend-of-events-in-london-489967
+2024-11-30-psc,2024-11-30,0,Park Lane,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/30-november-national-demonstration-for-palestine/
+2024-11-30-psc,2024-11-30,1,Whitehall,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/30-november-national-demonstration-for-palestine/
+2025-03-15-014,2025-03-15,0,Piccadilly (Green Park Station),protest,detailed,met_primary,https://news.met.police.uk/news/met-ready-for-busy-weekend-of-protests-and-other-events-495139
+2025-03-15-014,2025-03-15,1,Piccadilly Circus,protest,detailed,met_primary,https://news.met.police.uk/news/met-ready-for-busy-weekend-of-protests-and-other-events-495139
+2025-03-15-014,2025-03-15,2,Haymarket,protest,detailed,met_primary,https://news.met.police.uk/news/met-ready-for-busy-weekend-of-protests-and-other-events-495139
+2025-03-15-014,2025-03-15,3,Cockspur Street,protest,detailed,met_primary,https://news.met.police.uk/news/met-ready-for-busy-weekend-of-protests-and-other-events-495139
+2025-03-15-014,2025-03-15,4,Whitehall,protest,detailed,met_primary,https://news.met.police.uk/news/met-ready-for-busy-weekend-of-protests-and-other-events-495139
+2025-03-22-015,2025-03-22,0,Park Lane / Wellington Arch,protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-weekend-protests-495387
+2025-03-22-015,2025-03-22,1,Grosvenor Square,protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-weekend-protests-495387
+2025-03-22-015,2025-03-22,2,Victoria Street,protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-weekend-protests-495387
+2025-03-22-015,2025-03-22,3,Artillery Row,protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-weekend-protests-495387
+2025-03-22-015,2025-03-22,4,Horseferry Road,protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-weekend-protests-495387
+2025-03-23-016,2025-03-23,0,Marble Arch,protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-weekend-protests-495387
+2025-03-23-016,2025-03-23,1,Oxford Street,protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-weekend-protests-495387
+2025-03-23-016,2025-03-23,2,Portland Place,protest,partial,met_primary,https://news.met.police.uk/news/met-sets-out-policing-plans-ahead-of-weekend-protests-495387
+2025-05-17-nakba,2025-05-17,0,Victoria Embankment,protest,detailed,organizer_pre_event_notice,https://palestinecampaign.org/events/national-demonstration-nakba-77/
+2025-05-17-nakba,2025-05-17,1,Westminster Bridge,protest,detailed,organizer_pre_event_notice,https://palestinecampaign.org/events/national-demonstration-nakba-77/
+2025-05-17-nakba,2025-05-17,2,South Bank,protest,detailed,organizer_pre_event_notice,https://palestinecampaign.org/events/national-demonstration-nakba-77/
+2025-05-17-nakba,2025-05-17,3,Waterloo Bridge,protest,detailed,organizer_pre_event_notice,https://palestinecampaign.org/events/national-demonstration-nakba-77/
+2025-05-17-nakba,2025-05-17,4,Whitehall,protest,detailed,organizer_pre_event_notice,https://palestinecampaign.org/events/national-demonstration-nakba-77/
+2025-06-21-psc,2025-06-21,0,Russell Square,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-demonstration-21-june-25/
+2025-06-21-psc,2025-06-21,1,Whitehall,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-demonstration-21-june-25/
+2025-08-09-psc,2025-08-09,0,Russell Square,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-march-for-palestine-stop-starving-gaza-stop-arming-israel/
+2025-08-09-psc,2025-08-09,1,Downing Street,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-march-for-palestine-stop-starving-gaza-stop-arming-israel/
+2025-09-06-psc,2025-09-06,0,Russell Square,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-march-for-palestine-stop-starving-gaza-6-sept/
+2025-09-06-psc,2025-09-06,1,Whitehall,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/national-march-for-palestine-stop-starving-gaza-6-sept/
+2025-09-13-sutr,2025-09-13,0,Russell Square,protest,detailed,met_primary,https://www.met.police.uk/foi-ai/metropolitan-police/disclosure-2025/september-2025/mps-urges-muslim-londoners-change-their-plans/
+2025-09-13-sutr,2025-09-13,1,Kingsway,protest,detailed,met_primary,https://www.met.police.uk/foi-ai/metropolitan-police/disclosure-2025/september-2025/mps-urges-muslim-londoners-change-their-plans/
+2025-09-13-sutr,2025-09-13,2,Aldwych,protest,detailed,met_primary,https://www.met.police.uk/foi-ai/metropolitan-police/disclosure-2025/september-2025/mps-urges-muslim-londoners-change-their-plans/
+2025-09-13-sutr,2025-09-13,3,Strand,protest,detailed,met_primary,https://www.met.police.uk/foi-ai/metropolitan-police/disclosure-2025/september-2025/mps-urges-muslim-londoners-change-their-plans/
+2025-09-13-sutr,2025-09-13,4,northern end of Whitehall,protest,detailed,met_primary,https://www.met.police.uk/foi-ai/metropolitan-police/disclosure-2025/september-2025/mps-urges-muslim-londoners-change-their-plans/
+2025-09-13-utk,2025-09-13,0,Stamford Street,protest,detailed,met_primary,https://www.met.police.uk/foi-ai/metropolitan-police/disclosure-2025/september-2025/mps-urges-muslim-londoners-change-their-plans/
+2025-09-13-utk,2025-09-13,1,York Road,protest,detailed,met_primary,https://www.met.police.uk/foi-ai/metropolitan-police/disclosure-2025/september-2025/mps-urges-muslim-londoners-change-their-plans/
+2025-09-13-utk,2025-09-13,2,Westminster Bridge,protest,detailed,met_primary,https://www.met.police.uk/foi-ai/metropolitan-police/disclosure-2025/september-2025/mps-urges-muslim-londoners-change-their-plans/
+2025-09-13-utk,2025-09-13,3,southern end of Whitehall,protest,detailed,met_primary,https://www.met.police.uk/foi-ai/metropolitan-police/disclosure-2025/september-2025/mps-urges-muslim-londoners-change-their-plans/
+2025-09-17-stoptrump,2025-09-17,0,Portland Place,protest,detailed,organizer_pre_event_notice,https://stoptrump.org.uk/protest/
+2025-09-17-stoptrump,2025-09-17,1,Regent Street,protest,detailed,organizer_pre_event_notice,https://stoptrump.org.uk/protest/
+2025-09-17-stoptrump,2025-09-17,2,Piccadilly Circus,protest,detailed,organizer_pre_event_notice,https://stoptrump.org.uk/protest/
+2025-09-17-stoptrump,2025-09-17,3,Whitehall,protest,detailed,organizer_pre_event_notice,https://stoptrump.org.uk/protest/
+2025-09-17-stoptrump,2025-09-17,4,Parliament Square,protest,detailed,organizer_pre_event_notice,https://stoptrump.org.uk/protest/
+2025-10-11-018,2025-10-11,0,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-10-11-018,2025-10-11,1,Cumberland Gate,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-10-11-018,2025-10-11,2,Bayswater Road,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-10-11-018,2025-10-11,3,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-10-11-pc,2025-10-11,0,Victoria Embankment,protest,partial,met_primary,https://news.met.police.uk/news/conditions-for-protest-on-11th-october-502033
+2025-10-11-pc,2025-10-11,1,Westminster Bridge,protest,partial,met_primary,https://news.met.police.uk/news/conditions-for-protest-on-11th-october-502033
+2025-10-11-pc,2025-10-11,2,Waterloo Bridge,protest,partial,met_primary,https://news.met.police.uk/news/conditions-for-protest-on-11th-october-502033
+2025-10-11-pc,2025-10-11,3,Strand,protest,partial,met_primary,https://news.met.police.uk/news/conditions-for-protest-on-11th-october-502033
+2025-10-11-pc,2025-10-11,4,Whitehall,protest,partial,met_primary,https://news.met.police.uk/news/conditions-for-protest-on-11th-october-502033
+2025-10-18-019,2025-10-18,0,Marble Arch,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-10-18-019,2025-10-18,1,Oxford Street,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-10-18-019,2025-10-18,2,Charing Cross Road,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-10-18-019,2025-10-18,3,Shaftesbury Avenue,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-10-18-019,2025-10-18,4,Haymarket,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-10-18-019,2025-10-18,5,Cockspur Street,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-10-18-019,2025-10-18,6,Whitehall,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-01-020,2025-11-01,0,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-01-020,2025-11-01,1,Oxford Street,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-01-020,2025-11-01,2,Piccadilly Circus,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-01-020,2025-11-01,3,Pall Mall,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-01-020,2025-11-01,4,Green Park Station,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-01-020,2025-11-01,5,Hyde Park Corner,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-01-020,2025-11-01,6,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-15-021,2025-11-15,0,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-15-021,2025-11-15,1,Hyde Park Corner,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-15-021,2025-11-15,2,Knightsbridge,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-11-15-021,2025-11-15,3,Iranian Embassy,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-12-20-022,2025-12-20,0,Church Street,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-12-20-022,2025-12-20,1,Edgware Road,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2025-12-20-022,2025-12-20,2,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-01-31-023,2026-01-31,0,Russell Square,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-01-31-023,2026-01-31,1,Southampton Row,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-01-31-023,2026-01-31,2,Kingsway,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-01-31-023,2026-01-31,3,Aldwych,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-01-31-023,2026-01-31,4,Strand,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-01-31-023,2026-01-31,5,Trafalgar Square,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-01-31-023,2026-01-31,6,Whitehall,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-07-024,2026-02-07,0,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-07-024,2026-02-07,1,Park Lane,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-07-024,2026-02-07,2,Piccadilly,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-07-024,2026-02-07,3,Downing Street,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-28-025,2026-02-28,0,Downing Street,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-28-025,2026-02-28,1,Trafalgar Square,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-28-025,2026-02-28,2,Piccadilly Circus,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-28-025,2026-02-28,3,Regent Street,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-28-025,2026-02-28,4,Oxford Street,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-28-025,2026-02-28,5,Marble Arch,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-28-025,2026-02-28,6,Park Lane,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-28-025,2026-02-28,7,Knightsbridge,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-02-28-025,2026-02-28,8,Iranian Embassy,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-07-026,2026-03-07,0,Whitehall,protest,endpoints_only,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-07-026,2026-03-07,1,Hyde Park Corner,protest,endpoints_only,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-07-026,2026-03-07,2,Iranian Embassy,protest,endpoints_only,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-08-027,2026-03-08,0,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-08-027,2026-03-08,1,Park Lane,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-08-027,2026-03-08,2,Downing Street,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-21-psc,2026-03-21,0,Russell Square,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/day-of-action-stop-bombing-iran-hands-off-lebanon-free-palestine/
+2026-03-21-psc,2026-03-21,1,Whitehall,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/day-of-action-stop-bombing-iran-hands-off-lebanon-free-palestine/
+2026-03-28-028,2026-03-28,0,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-28-028,2026-03-28,1,Edgware Road,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-28-028,2026-03-28,2,Hilton London Metropole,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-28-029,2026-03-28,0,Park Lane,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-28-029,2026-03-28,1,Piccadilly,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-28-029,2026-03-28,2,Haymarket,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-28-029,2026-03-28,3,Trafalgar Square,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-03-28-together,2026-03-28,0,Park Lane,protest,detailed,organizer_pre_event_notice,https://www.togetheralliance.org.uk/access
+2026-03-28-together,2026-03-28,1,Piccadilly,protest,detailed,organizer_pre_event_notice,https://www.togetheralliance.org.uk/access
+2026-03-28-together,2026-03-28,2,Green Park Station,protest,detailed,organizer_pre_event_notice,https://www.togetheralliance.org.uk/access
+2026-03-28-together,2026-03-28,3,Regent Street,protest,detailed,organizer_pre_event_notice,https://www.togetheralliance.org.uk/access
+2026-03-28-together,2026-03-28,4,Pall Mall,protest,detailed,organizer_pre_event_notice,https://www.togetheralliance.org.uk/access
+2026-03-28-together,2026-03-28,5,Trafalgar Square,protest,detailed,organizer_pre_event_notice,https://www.togetheralliance.org.uk/access
+2026-03-28-together,2026-03-28,6,Whitehall,protest,detailed,organizer_pre_event_notice,https://www.togetheralliance.org.uk/access
+2026-04-25-030,2026-04-25,0,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-04-25-030,2026-04-25,1,Park Lane,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-04-25-030,2026-04-25,2,Cenotaph,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-16-nakba,2026-05-16,0,Exhibition Road,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/nakba-78-march-for-palestine-2/
+2026-05-16-nakba,2026-05-16,1,Pall Mall,protest,endpoints_only,organizer_pre_event_notice,https://palestinecampaign.org/events/nakba-78-march-for-palestine-2/
+2026-05-23-031,2026-05-23,0,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-23-031,2026-05-23,1,Oxford Street,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-23-031,2026-05-23,2,Regent Street,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-23-031,2026-05-23,3,Whitehall,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-23-032,2026-05-23,0,Park Lane,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-23-032,2026-05-23,1,Piccadilly,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-23-032,2026-05-23,2,Haymarket,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-23-032,2026-05-23,3,Cockspur Street,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-23-032,2026-05-23,4,Trafalgar Square,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-24-033,2026-05-24,0,Park Lane / Hyde Park,non_protest_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-24-033,2026-05-24,1,Piccadilly,non_protest_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-05-24-033,2026-05-24,2,Trafalgar Square,non_protest_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-06-034,2026-06-06,0,Downing Street,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-06-034,2026-06-06,1,Trafalgar Square,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-06-034,2026-06-06,2,Piccadilly Circus,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-06-034,2026-06-06,3,Oxford Street,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-06-034,2026-06-06,4,Marble Arch,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-06-034,2026-06-06,5,Park Lane,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-06-034,2026-06-06,6,Hyde Park Corner,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-06-034,2026-06-06,7,Iranian Embassy,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-14-035,2026-06-14,0,Waterloo Place,cultural_procession,partial,bid_social_media_report,https://marble-arch.london/security-updates/
+2026-06-14-035,2026-06-14,1,Piccadilly,cultural_procession,partial,bid_social_media_report,https://marble-arch.london/security-updates/
+2026-06-14-035,2026-06-14,2,Hyde Park Corner,cultural_procession,partial,bid_social_media_report,https://marble-arch.london/security-updates/
+2026-06-14-035,2026-06-14,3,Marble Arch,cultural_procession,partial,bid_social_media_report,https://marble-arch.london/security-updates/
+2026-06-14-035,2026-06-14,4,Holland Park,cultural_procession,partial,bid_social_media_report,https://marble-arch.london/security-updates/
+2026-06-20-036,2026-06-20,0,Richmond Terrace,civic_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-20-036,2026-06-20,1,Whitehall,civic_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-20-036,2026-06-20,2,Pall Mall,civic_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-20-036,2026-06-20,3,Piccadilly,civic_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-20-036,2026-06-20,4,Hyde Park Corner,civic_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-20-036,2026-06-20,5,Park Lane,civic_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-20-036,2026-06-20,6,Speakers Corner,civic_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-25-037,2026-06-25,0,Marble Arch,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-25-037,2026-06-25,1,Oxford Street,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-25-037,2026-06-25,2,Regent Street,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-25-037,2026-06-25,3,Pall Mall,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-25-037,2026-06-25,4,Trafalgar Square,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-25-037,2026-06-25,5,Whitehall,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-06-25-037,2026-06-25,6,Richmond Terrace,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-04-pride,2026-07-04,0,Hyde Park Corner,civic_procession,detailed,council_primary,https://www.westminster.gov.uk/pride-london-2026-information-businesses-and-residents
+2026-07-04-pride,2026-07-04,1,Piccadilly,civic_procession,detailed,council_primary,https://www.westminster.gov.uk/pride-london-2026-information-businesses-and-residents
+2026-07-04-pride,2026-07-04,2,Piccadilly Circus,civic_procession,detailed,council_primary,https://www.westminster.gov.uk/pride-london-2026-information-businesses-and-residents
+2026-07-04-pride,2026-07-04,3,Haymarket,civic_procession,detailed,council_primary,https://www.westminster.gov.uk/pride-london-2026-information-businesses-and-residents
+2026-07-04-pride,2026-07-04,4,Trafalgar Square,civic_procession,detailed,council_primary,https://www.westminster.gov.uk/pride-london-2026-information-businesses-and-residents
+2026-07-04-pride,2026-07-04,5,Whitehall Place,civic_procession,detailed,council_primary,https://www.westminster.gov.uk/pride-london-2026-information-businesses-and-residents
+2026-07-11-038,2026-07-11,0,Richmond Terrace,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-11-038,2026-07-11,1,Oxford Street,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-11-038,2026-07-11,2,Park Lane,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-11-038,2026-07-11,3,Iranian Embassy,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-18-017,2026-07-18,0,Russell Square,protest,partial,met_primary,https://news.met.police.uk/news/conditions-for-national-march-for-palestine-on-saturday-18-july-511412
+2026-07-18-017,2026-07-18,1,Holborn,protest,partial,met_primary,https://news.met.police.uk/news/conditions-for-national-march-for-palestine-on-saturday-18-july-511412
+2026-07-18-017,2026-07-18,2,Strand,protest,partial,met_primary,https://news.met.police.uk/news/conditions-for-national-march-for-palestine-on-saturday-18-july-511412
+2026-07-18-017,2026-07-18,3,Whitehall,protest,partial,met_primary,https://news.met.police.uk/news/conditions-for-national-march-for-palestine-on-saturday-18-july-511412
+2026-07-18-039,2026-07-18,0,Trafalgar Square,civic_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-18-039,2026-07-18,1,Piccadilly Circus,civic_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-18-039,2026-07-18,2,Oxford Street,civic_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-18-039,2026-07-18,3,Bond Street,civic_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-18-039,2026-07-18,4,Marble Arch,civic_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-18-039,2026-07-18,5,Hyde Park,civic_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-25-transpride,2026-07-25,0,Langham Place,protest,detailed,organizer_pre_event_notice,https://londontranspride.org/access
+2026-07-25-transpride,2026-07-25,1,Regent Street,protest,detailed,organizer_pre_event_notice,https://londontranspride.org/access
+2026-07-25-transpride,2026-07-25,2,Swallow Street,protest,detailed,organizer_pre_event_notice,https://londontranspride.org/access
+2026-07-25-transpride,2026-07-25,3,Coventry Street,protest,detailed,organizer_pre_event_notice,https://londontranspride.org/access
+2026-07-25-transpride,2026-07-25,4,Haymarket,protest,detailed,organizer_pre_event_notice,https://londontranspride.org/access
+2026-07-25-transpride,2026-07-25,5,Pall Mall East,protest,detailed,organizer_pre_event_notice,https://londontranspride.org/access
+2026-07-25-transpride,2026-07-25,6,Cockspur Street,protest,detailed,organizer_pre_event_notice,https://londontranspride.org/access
+2026-07-25-transpride,2026-07-25,7,Trafalgar Square,protest,detailed,organizer_pre_event_notice,https://londontranspride.org/access
+2026-07-30-040,2026-07-30,0,Speakers Corner,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-30-040,2026-07-30,1,Park Lane,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-30-040,2026-07-30,2,Hyde Park Corner,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-30-040,2026-07-30,3,Knightsbridge,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-07-30-040,2026-07-30,4,Pakistani High Commission,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-08-041,2026-08-08,0,Marble Arch,non_protest_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-08-041,2026-08-08,1,Edgware Road,non_protest_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-08-041,2026-08-08,2,Paddington Green,non_protest_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-09-042,2026-08-09,0,Marble Arch,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-09-042,2026-08-09,1,Park Lane southbound,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-09-042,2026-08-09,2,Park Lane northbound,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-09-042,2026-08-09,3,Marble Arch,non_protest_procession,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,0,Hanover Square Gardens,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,1,Oxford Street,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,2,Marble Arch,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,3,Park Lane,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,4,Curzon Street,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,5,Piccadilly,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,6,Piccadilly Circus,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,7,Regent Street,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,8,Oxford Circus,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,9,Oxford Street,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-08-22-043,2026-08-22,10,Hanover Square Gardens,protest,detailed,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-09-05-044,2026-09-05,0,Speakers Corner,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-09-05-044,2026-09-05,1,Oxford Street,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-09-05-044,2026-09-05,2,Trafalgar Square,protest,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-09-19-045,2026-09-19,0,Hyde Park Corner,civic_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-09-19-045,2026-09-19,1,Marble Arch,civic_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-09-19-045,2026-09-19,2,Oxford Street,civic_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-09-19-045,2026-09-19,3,Lincoln’s Inn Fields,civic_procession,partial,bid_met_attributed,https://marble-arch.london/security-updates/
+2026-09-20-046,2026-09-20,0,Downing Street,protest,partial,bid_social_media_report,https://marble-arch.london/security-updates/
+2026-09-20-046,2026-09-20,1,Trafalgar Square,protest,partial,bid_social_media_report,https://marble-arch.london/security-updates/
+2026-09-20-046,2026-09-20,2,Piccadilly,protest,partial,bid_social_media_report,https://marble-arch.london/security-updates/
+2026-09-20-046,2026-09-20,3,Oxford Street,protest,partial,bid_social_media_report,https://marble-arch.london/security-updates/
+2026-09-20-046,2026-09-20,4,Marble Arch,protest,partial,bid_social_media_report,https://marble-arch.london/security-updates/
+2026-10-04-cable,2026-10-04,0,Whitechapel Road,commemorative_procession,detailed,met_primary,https://news.met.police.uk/news/dac-james-harmans-statement-at-media-briefing-ahead-of-public-order-events-513525
+2026-10-04-cable,2026-10-04,1,Aldgate East Station,commemorative_procession,detailed,met_primary,https://news.met.police.uk/news/dac-james-harmans-statement-at-media-briefing-ahead-of-public-order-events-513525
+2026-10-04-cable,2026-10-04,2,Leman Street,commemorative_procession,detailed,met_primary,https://news.met.police.uk/news/dac-james-harmans-statement-at-media-briefing-ahead-of-public-order-events-513525
+2026-10-04-cable,2026-10-04,3,Cable Street,commemorative_procession,detailed,met_primary,https://news.met.police.uk/news/dac-james-harmans-statement-at-media-briefing-ahead-of-public-order-events-513525
+2026-10-04-cable,2026-10-04,4,St George’s Town Hall,commemorative_procession,detailed,met_primary,https://news.met.police.uk/news/dac-james-harmans-statement-at-media-briefing-ahead-of-public-order-events-513525
+2026-10-07-student,2026-10-07,0,Lincoln’s Inn Fields,protest,detailed,met_primary,https://news.met.police.uk/news/conditions-imposed-on-student-march-on-wednesday-7-october-513621
+2026-10-07-student,2026-10-07,1,Remnant Street,protest,detailed,met_primary,https://news.met.police.uk/news/conditions-imposed-on-student-march-on-wednesday-7-october-513621
+2026-10-07-student,2026-10-07,2,Kingsway,protest,detailed,met_primary,https://news.met.police.uk/news/conditions-imposed-on-student-march-on-wednesday-7-october-513621
+2026-10-07-student,2026-10-07,3,Southampton Row,protest,detailed,met_primary,https://news.met.police.uk/news/conditions-imposed-on-student-march-on-wednesday-7-october-513621
+2026-10-07-student,2026-10-07,4,Russell Square,protest,detailed,met_primary,https://news.met.police.uk/news/conditions-imposed-on-student-march-on-wednesday-7-october-513621
+2026-10-10-pc,2026-10-10,0,Victoria Embankment,protest,detailed,met_primary,https://news.met.police.uk/news/met-announces-conditions-for-palestine-coalition-protest-513794
+2026-10-10-pc,2026-10-10,1,Westminster Bridge,protest,detailed,met_primary,https://news.met.police.uk/news/met-announces-conditions-for-palestine-coalition-protest-513794
+2026-10-10-pc,2026-10-10,2,York Road,protest,detailed,met_primary,https://news.met.police.uk/news/met-announces-conditions-for-palestine-coalition-protest-513794
+2026-10-10-pc,2026-10-10,3,Waterloo Bridge,protest,detailed,met_primary,https://news.met.police.uk/news/met-announces-conditions-for-palestine-coalition-protest-513794
+2026-10-10-pc,2026-10-10,4,Strand,protest,detailed,met_primary,https://news.met.police.uk/news/met-announces-conditions-for-palestine-coalition-protest-513794
+2026-10-10-pc,2026-10-10,5,Whitehall,protest,detailed,met_primary,https://news.met.police.uk/news/met-announces-conditions-for-palestine-coalition-protest-513794
