@@ -26,6 +26,8 @@ gtfs-realtime-bindings>=0.0.7
 
 # --- JamCam pipeline (src/pipeline) ---
 opencv-python-headless>=4.10
+ultralytics>=8.3
+pillow>=10.0
 
 # --- Tests ---
 pytest>=8.0
