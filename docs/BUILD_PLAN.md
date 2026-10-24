@@ -16,6 +16,11 @@
     loads TfL's image and clip directly, no processing).
   Tier assignment is configurable; Step 0 and Step 5 measurements decide tier sizes. Never poll all zones 1–2
   cameras every 15 s.
+- **Schema additions (Step 1):** `clips.kind` (`clip` | `still`), `clips.attempts` (a clip whose claim expires
+  `MAX_ATTEMPTS` times is failed, not requeued forever), `clips.finished_at` (for seconds per chunk), and
+  `clips.path` is nullable since bytes live in `clips.data`. `observations` also carries `chunk_index` and `kind`.
+  Both UNIQUE keys are `(camera_id, frame_time, chunk_index, kind)`. The pipeline DB is SQLite only
+  (`data/pipeline.db`), with SQL kept in `src/pipeline/db.py` so Postgres can be added later.
 - **Tests:** `.gitignore` no longer ignores `tests/`, `test_*.py`, `*_test.py`.
 - **Reference poller:** `jamcam_poller.py` lives at `src/pipeline/jamcam_poller.py` (logic unchanged; CLI is
   `python -m src.pipeline.jamcam_poller --list`). Other modules import its functions from there.
