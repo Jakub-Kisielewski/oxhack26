@@ -1,15 +1,15 @@
-# Ingestion (Tier 1)
+# Ingestion
 
-Crawlers for Met Police newsroom, OSAC embassy alerts, and TfL road disruptions.
+Tier 1 crawlers live under `src/ingestion/crawler/` (Met Police, OSAC, TfL, Marble Arch, organizer sites).
 
 ## Run
 
 From repo root:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+source .venv/bin/activate
 pip install -r requirements.txt
-python run_test_pipeline.py
+python -m src.ingestion
 ```
 
-Outputs: `data/runs/{run_id}/{met_police,osac,tfl_road_disruption}/records.json`
+Outputs: `data/runs/{run_id}/{platform_id}/records.json` plus merged files under `data/runs/{run_id}/_all/`.

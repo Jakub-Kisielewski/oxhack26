@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urljoin
 
-from ingestion.client import HttpClient
-from ingestion.models import ProtestRecord
-from ingestion.parse_utils import (
+from ingestion.crawler.client import HttpClient
+from ingestion.crawler.models import ProtestRecord
+from ingestion.crawler.parse_utils import (
     clean_html_text,
     extract_paragraphs,
     parse_participant_estimate,

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from ingestion.crawler.sources.organizers.sites import ORGANIZER_SITES
+
 PLATFORM_CATALOG: dict[str, dict[str, str]] = {
     "met_police": {
         "platform_id": "met_police",
@@ -18,7 +20,19 @@ PLATFORM_CATALOG: dict[str, dict[str, str]] = {
         "platform_name": "TfL Unified API (Road Disruptions)",
         "platform_url": "https://api.tfl.gov.uk",
     },
+    "marble_arch_security": {
+        "platform_id": "marble_arch_security",
+        "platform_name": "Marble Arch London (Security Updates)",
+        "platform_url": "https://marble-arch.london/security-updates/",
+    },
 }
+
+for _site in ORGANIZER_SITES:
+    PLATFORM_CATALOG[_site.platform_id] = {
+        "platform_id": _site.platform_id,
+        "platform_name": _site.platform_name,
+        "platform_url": _site.platform_url,
+    }
 
 
 def platform_meta(platform_id: str) -> dict[str, str]:
@@ -33,9 +47,11 @@ def platform_meta(platform_id: str) -> dict[str, str]:
 
 
 def record_export_dict(record: Any) -> dict[str, Any]:
-    payload = record.to_dict()
-    meta = platform_meta(payload["source"])
-    payload["platform_id"] = meta["platform_id"]
-    payload["platform_name"] = meta["platform_name"]
-    payload["platform_url"] = meta["platform_url"]
-    return payload
+    if hasattr(record, "to_dict"):
+        data = record.to_dict()
+    elif hasattr(record, "model_dump"):
+        data = record.model_dump()
+    else:
+        data = dict(record)
+    data.update(platform_meta(data.get("source", "")))
+    return data
