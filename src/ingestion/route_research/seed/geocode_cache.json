@@ -1,0 +1,474 @@
+{
+  "Aldgate East Station": {
+    "latitude": 51.5157866,
+    "longitude": -0.072171,
+    "ok": true
+  },
+  "Aldwych": {
+    "latitude": 51.5130658,
+    "longitude": -0.1178416,
+    "ok": true
+  },
+  "Artillery Row": {
+    "latitude": 51.4966794,
+    "longitude": -0.1356401,
+    "ok": true
+  },
+  "BBC Portland Place": {
+    "latitude": 51.5187829,
+    "longitude": -0.1438328,
+    "ok": true
+  },
+  "Bayswater Road": {
+    "latitude": 51.5103537,
+    "longitude": -0.1860128,
+    "ok": true
+  },
+  "Bond Street": {
+    "latitude": 51.5135348,
+    "longitude": -0.1470905,
+    "ok": true
+  },
+  "Cable Street": {
+    "latitude": 51.5114637,
+    "longitude": -0.0468376,
+    "ok": true
+  },
+  "Cenotaph": {
+    "latitude": 51.5026793,
+    "longitude": -0.1260906,
+    "ok": true
+  },
+  "Charing Cross Road": {
+    "latitude": 51.5138432,
+    "longitude": -0.1295022,
+    "ok": true
+  },
+  "Church Street": {
+    "latitude": 51.5232921,
+    "longitude": -0.1704954,
+    "ok": true
+  },
+  "Cockspur Street": {
+    "latitude": 51.5076791,
+    "longitude": -0.1307098,
+    "ok": true
+  },
+  "Coventry Street": {
+    "latitude": 51.5102665,
+    "longitude": -0.1324231,
+    "ok": true
+  },
+  "Cumberland Gate": {
+    "latitude": 51.5123064,
+    "longitude": -0.1614103,
+    "ok": true
+  },
+  "Curzon Street": {
+    "latitude": 51.5068081,
+    "longitude": -0.14694,
+    "ok": true
+  },
+  "Downing Street": {
+    "latitude": 51.5032088,
+    "longitude": -0.1271283,
+    "ok": true
+  },
+  "Edgware Road": {
+    "latitude": 51.5201935,
+    "longitude": -0.1667636,
+    "ok": true
+  },
+  "Exhibition Road": {
+    "latitude": 51.4981218,
+    "longitude": -0.1740327,
+    "ok": true
+  },
+  "Fleet Street": {
+    "latitude": 51.5139523,
+    "longitude": -0.1104742,
+    "ok": true
+  },
+  "Green Park Station": {
+    "latitude": 51.5065266,
+    "longitude": -0.1431467,
+    "ok": true
+  },
+  "Grosvenor Square": {
+    "latitude": 51.5115241,
+    "longitude": -0.1513894,
+    "ok": true
+  },
+  "Hanover Square Gardens": {
+    "latitude": 51.5140882,
+    "longitude": -0.1445895,
+    "nominatim_query": "Hanover Square, London W1S 1HF",
+    "notes": "National Animal Rights March loop start/finish; OSM leisure=park Hanover Square.",
+    "ok": true,
+    "osm_display_name": "Hanover Square (central garden)",
+    "source": "manual_override"
+  },
+  "Haymarket": {
+    "latitude": 51.5094827,
+    "longitude": -0.1326426,
+    "ok": true
+  },
+  "Hilton London Metropole": {
+    "latitude": 51.5193384,
+    "longitude": -0.1699149,
+    "ok": true
+  },
+  "Holborn": {
+    "latitude": 51.5195982,
+    "longitude": -0.1137266,
+    "ok": true
+  },
+  "Holland Park": {
+    "latitude": 51.5029216,
+    "longitude": -0.2040959,
+    "ok": true
+  },
+  "Horseferry Road": {
+    "latitude": 51.4948898,
+    "longitude": -0.1320389,
+    "ok": true
+  },
+  "Hyde Park": {
+    "latitude": 51.5074889,
+    "longitude": -0.1622074,
+    "ok": true
+  },
+  "Hyde Park Corner": {
+    "latitude": 51.5027264,
+    "longitude": -0.1543249,
+    "ok": true
+  },
+  "Iranian Embassy": {
+    "latitude": 51.5018691,
+    "longitude": -0.1883336,
+    "ok": true
+  },
+  "Israeli Embassy Kensington": {
+    "latitude": 51.503197,
+    "longitude": -0.189642,
+    "nominatim_query": "Embassy of Israel, 2 Palace Green, London W8 4QB",
+    "notes": "PSC Feb 2024 march endpoint from Marble Arch.",
+    "ok": true,
+    "osm_display_name": "Embassy of Israel, Palace Green",
+    "source": "manual_override"
+  },
+  "Kingsway": {
+    "latitude": 51.5172974,
+    "longitude": -0.1203068,
+    "ok": true
+  },
+  "Knightsbridge": {
+    "latitude": 51.5008444,
+    "longitude": -0.166965,
+    "ok": true
+  },
+  "Langham Place": {
+    "latitude": 51.518391,
+    "longitude": -0.142885,
+    "nominatim_query": "Langham Place, Westminster, London W1",
+    "notes": "London Trans+ Pride start; do not use generic Langham Place query.",
+    "ok": true,
+    "osm_display_name": "Langham Place, Westminster (corrects wrong Nominatim hit)",
+    "source": "manual_override"
+  },
+  "Leman Street": {
+    "latitude": 51.5116386,
+    "longitude": -0.0688873,
+    "ok": true
+  },
+  "Lincoln\u2019s Inn Fields": {
+    "latitude": 51.5162327,
+    "longitude": -0.1165666,
+    "ok": true
+  },
+  "Marble Arch": {
+    "latitude": 51.5131841,
+    "longitude": -0.1589053,
+    "ok": true
+  },
+  "Nine Elms (US Embassy area)": {
+    "latitude": 51.4825798,
+    "longitude": -0.1322293,
+    "nominatim_query": null,
+    "notes": "Met partial route Nov 2024; use embassy centroid.",
+    "ok": true,
+    "osm_display_name": "US Embassy Nine Elms / Nine Elms Lane",
+    "source": "manual_override"
+  },
+  "Nine Elms Lane": {
+    "latitude": 51.4834671,
+    "longitude": -0.1318121,
+    "ok": true
+  },
+  "Oxford Circus": {
+    "latitude": 51.5154617,
+    "longitude": -0.1408111,
+    "ok": true
+  },
+  "Oxford Street": {
+    "latitude": 51.5151531,
+    "longitude": -0.1431002,
+    "ok": true
+  },
+  "Paddington Green": {
+    "latitude": 51.5204611,
+    "longitude": -0.1740697,
+    "ok": true
+  },
+  "Pakistani High Commission": {
+    "latitude": 51.499384,
+    "longitude": -0.158912,
+    "nominatim_query": "High Commission of Pakistan, Lowndes Square, London",
+    "notes": "Joint Awami Action Committee march endpoint, Jul 2026.",
+    "ok": true,
+    "osm_display_name": "High Commission of Pakistan, 34-36 Lowndes Square",
+    "source": "manual_override"
+  },
+  "Pall Mall": {
+    "latitude": 51.5053464,
+    "longitude": -0.1376862,
+    "ok": true
+  },
+  "Pall Mall East": {
+    "latitude": 51.5078505,
+    "longitude": -0.1306363,
+    "ok": true
+  },
+  "Park Lane": {
+    "latitude": 51.509488,
+    "longitude": -0.1563231,
+    "ok": true
+  },
+  "Park Lane / Hyde Park": {
+    "latitude": 51.510024,
+    "longitude": -0.1572907,
+    "ok": true
+  },
+  "Park Lane / Wellington Arch": {
+    "latitude": 51.502536,
+    "longitude": -0.150818,
+    "nominatim_query": "Wellington Arch, London, UK",
+    "notes": "For the Children procession start, Mar 2025 (Met).",
+    "ok": true,
+    "osm_display_name": "Wellington Arch, Park Lane / Hyde Park Corner",
+    "source": "manual_override"
+  },
+  "Park Lane northbound": {
+    "latitude": 51.5124376,
+    "longitude": -0.1587525,
+    "nominatim_query": null,
+    "notes": "Return leg of Park Lane loop before Marble Arch.",
+    "ok": true,
+    "osm_display_name": "Park Lane (northbound carriageway, near Marble Arch)",
+    "source": "manual_override"
+  },
+  "Park Lane southbound": {
+    "latitude": 51.509411,
+    "longitude": -0.1564796,
+    "nominatim_query": null,
+    "notes": "Hussaini Association loop; mid Park Lane heading toward Hyde Park Corner.",
+    "ok": true,
+    "osm_display_name": "Park Lane (southbound carriageway, mid)",
+    "source": "manual_override"
+  },
+  "Parliament Square": {
+    "latitude": 51.5006049,
+    "longitude": -0.1268306,
+    "ok": true
+  },
+  "Piccadilly": {
+    "latitude": 51.5084151,
+    "longitude": -0.1387944,
+    "ok": true
+  },
+  "Piccadilly (Green Park Station)": {
+    "latitude": 51.5065266,
+    "longitude": -0.1431467,
+    "nominatim_query": "Green Park, Piccadilly, London",
+    "notes": "Met Palestine Coalition march, Mar 2025; same location as Green Park Station waypoint.",
+    "ok": true,
+    "osm_display_name": "Green Park station, Piccadilly entrance",
+    "source": "manual_override"
+  },
+  "Piccadilly Circus": {
+    "latitude": 51.5101383,
+    "longitude": -0.133936,
+    "ok": true
+  },
+  "Portland Place": {
+    "latitude": 51.5181279,
+    "longitude": -0.1441668,
+    "ok": true
+  },
+  "Queen Victoria Street": {
+    "latitude": 51.5121809,
+    "longitude": -0.1022775,
+    "ok": true
+  },
+  "Regent Street": {
+    "latitude": 51.511433,
+    "longitude": -0.139229,
+    "ok": true
+  },
+  "Regent Street St James\u2019s": {
+    "latitude": 51.5089098,
+    "longitude": -0.1340245,
+    "ok": true
+  },
+  "Remnant Street": {
+    "latitude": 51.5165194,
+    "longitude": -0.119099,
+    "ok": true
+  },
+  "Richmond Terrace": {
+    "latitude": 51.503115,
+    "longitude": -0.1247303,
+    "ok": true
+  },
+  "Russell Square": {
+    "latitude": 51.5230529,
+    "longitude": -0.1242529,
+    "ok": true
+  },
+  "Shaftesbury Avenue": {
+    "latitude": 51.5131914,
+    "longitude": -0.1292068,
+    "ok": true
+  },
+  "South Bank": {
+    "latitude": 51.5065325,
+    "longitude": -0.1134203,
+    "ok": true
+  },
+  "Southampton Row": {
+    "latitude": 51.5206714,
+    "longitude": -0.1231076,
+    "ok": true
+  },
+  "Speakers Corner": {
+    "latitude": 51.5118775,
+    "longitude": -0.1600973,
+    "ok": true
+  },
+  "St George\u2019s Town Hall": {
+    "latitude": 51.5108975,
+    "longitude": -0.0584181,
+    "ok": true
+  },
+  "Stamford Street": {
+    "latitude": 51.5050493,
+    "longitude": -0.1130444,
+    "ok": true
+  },
+  "Strand": {
+    "latitude": 51.5098063,
+    "longitude": -0.1229694,
+    "ok": true
+  },
+  "Swallow Street": {
+    "latitude": 51.509276,
+    "longitude": -0.137335,
+    "nominatim_query": "10 Swallow Street, London W1B 4DE",
+    "notes": "Trans+ Pride route; corrects erroneous Essex geocode.",
+    "ok": true,
+    "osm_display_name": "Swallow Street, Mayfair",
+    "source": "manual_override"
+  },
+  "Trafalgar Square": {
+    "latitude": 51.5084502,
+    "longitude": -0.1284499,
+    "ok": true
+  },
+  "US Embassy Nine Elms": {
+    "latitude": 51.4825798,
+    "longitude": -0.1322293,
+    "ok": true
+  },
+  "Vauxhall Bridge": {
+    "latitude": 51.4875946,
+    "longitude": -0.1270136,
+    "ok": true
+  },
+  "Victoria": {
+    "latitude": 51.4950525,
+    "longitude": -0.1448455,
+    "ok": true
+  },
+  "Victoria Embankment": {
+    "latitude": 51.5105709,
+    "longitude": -0.1154852,
+    "ok": true
+  },
+  "Victoria Station": {
+    "latitude": 51.4950525,
+    "longitude": -0.1448455,
+    "ok": true
+  },
+  "Victoria Street": {
+    "latitude": 51.496729,
+    "longitude": -0.144706,
+    "nominatim_query": "Victoria Street, Westminster, London SW1",
+    "notes": "For the Children procession; corrects wrong Victoria Street outside London.",
+    "ok": true,
+    "osm_display_name": "Victoria Street, Westminster",
+    "source": "manual_override"
+  },
+  "Waterloo Bridge": {
+    "latitude": 51.5028379,
+    "longitude": -0.112801,
+    "ok": true
+  },
+  "Waterloo Place": {
+    "latitude": 51.5067519,
+    "longitude": -0.132283,
+    "ok": true
+  },
+  "Westminster Bridge": {
+    "latitude": 51.5008537,
+    "longitude": -0.1217847,
+    "ok": true
+  },
+  "Whitechapel Road": {
+    "latitude": 51.5187238,
+    "longitude": -0.0615138,
+    "ok": true
+  },
+  "Whitehall": {
+    "latitude": 51.5030645,
+    "longitude": -0.1259999,
+    "ok": true
+  },
+  "Whitehall Place": {
+    "latitude": 51.5059048,
+    "longitude": -0.1256889,
+    "ok": true
+  },
+  "York Road": {
+    "latitude": 51.5039592,
+    "longitude": -0.1148592,
+    "ok": true
+  },
+  "northern end of Whitehall": {
+    "latitude": 51.50705,
+    "longitude": -0.12785,
+    "nominatim_query": "Whitehall at Trafalgar Square, Westminster, London",
+    "notes": "Met SUTR counter-march static rally, Oct 2024; route enters Whitehall from Haymarket.",
+    "ok": true,
+    "osm_display_name": "Whitehall (north / Haymarket & Trafalgar end)",
+    "source": "manual_override"
+  },
+  "southern end of Whitehall": {
+    "latitude": 51.5026793,
+    "longitude": -0.1260906,
+    "nominatim_query": "Cenotaph, Whitehall, Westminster, London",
+    "notes": "Met Uniting the Kingdom march terminus, Oct 2024; opposite end from SUTR.",
+    "ok": true,
+    "osm_display_name": "The Cenotaph, Whitehall (south end rally area)",
+    "source": "manual_override"
+  }
+}

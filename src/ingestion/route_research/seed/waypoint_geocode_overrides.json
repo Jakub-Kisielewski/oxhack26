@@ -1,0 +1,93 @@
+{
+  "_comment": "Hand-reviewed geocodes for seed waypoint_name strings Nominatim cannot resolve reliably. Keys must match waypoints.csv exactly.",
+  "northern end of Whitehall": {
+    "nominatim_query": "Whitehall at Trafalgar Square, Westminster, London",
+    "latitude": 51.50705,
+    "longitude": -0.12785,
+    "osm_display_name": "Whitehall (north / Haymarket & Trafalgar end)",
+    "notes": "Met SUTR counter-march static rally, Oct 2024; route enters Whitehall from Haymarket."
+  },
+  "southern end of Whitehall": {
+    "nominatim_query": "Cenotaph, Whitehall, Westminster, London",
+    "latitude": 51.5026793,
+    "longitude": -0.1260906,
+    "osm_display_name": "The Cenotaph, Whitehall (south end rally area)",
+    "notes": "Met Uniting the Kingdom march terminus, Oct 2024; opposite end from SUTR."
+  },
+  "Israeli Embassy Kensington": {
+    "nominatim_query": "Embassy of Israel, 2 Palace Green, London W8 4QB",
+    "latitude": 51.503197,
+    "longitude": -0.189642,
+    "osm_display_name": "Embassy of Israel, Palace Green",
+    "notes": "PSC Feb 2024 march endpoint from Marble Arch."
+  },
+  "Hanover Square Gardens": {
+    "nominatim_query": "Hanover Square, London W1S 1HF",
+    "latitude": 51.5140882,
+    "longitude": -0.1445895,
+    "osm_display_name": "Hanover Square (central garden)",
+    "notes": "National Animal Rights March loop start/finish; OSM leisure=park Hanover Square."
+  },
+  "Piccadilly (Green Park Station)": {
+    "alias_coords_from": "Green Park Station",
+    "nominatim_query": "Green Park, Piccadilly, London",
+    "latitude": 51.5065266,
+    "longitude": -0.1431467,
+    "osm_display_name": "Green Park station, Piccadilly entrance",
+    "notes": "Met Palestine Coalition march, Mar 2025; same location as Green Park Station waypoint."
+  },
+  "Nine Elms (US Embassy area)": {
+    "alias_coords_from": "US Embassy Nine Elms",
+    "latitude": 51.4825798,
+    "longitude": -0.1322293,
+    "osm_display_name": "US Embassy Nine Elms / Nine Elms Lane",
+    "notes": "Met partial route Nov 2024; use embassy centroid."
+  },
+  "Park Lane / Wellington Arch": {
+    "nominatim_query": "Wellington Arch, London, UK",
+    "latitude": 51.502536,
+    "longitude": -0.150818,
+    "osm_display_name": "Wellington Arch, Park Lane / Hyde Park Corner",
+    "notes": "For the Children procession start, Mar 2025 (Met)."
+  },
+  "Park Lane southbound": {
+    "latitude": 51.509411,
+    "longitude": -0.1564796,
+    "osm_display_name": "Park Lane (southbound carriageway, mid)",
+    "notes": "Hussaini Association loop; mid Park Lane heading toward Hyde Park Corner."
+  },
+  "Park Lane northbound": {
+    "latitude": 51.5124376,
+    "longitude": -0.1587525,
+    "osm_display_name": "Park Lane (northbound carriageway, near Marble Arch)",
+    "notes": "Return leg of Park Lane loop before Marble Arch."
+  },
+  "Pakistani High Commission": {
+    "nominatim_query": "High Commission of Pakistan, Lowndes Square, London",
+    "latitude": 51.499384,
+    "longitude": -0.158912,
+    "osm_display_name": "High Commission of Pakistan, 34-36 Lowndes Square",
+    "notes": "Joint Awami Action Committee march endpoint, Jul 2026."
+  },
+  "Langham Place": {
+    "nominatim_query": "Langham Place, Westminster, London W1",
+    "latitude": 51.518391,
+    "longitude": -0.142885,
+    "osm_display_name": "Langham Place, Westminster (corrects wrong Nominatim hit)",
+    "notes": "London Trans+ Pride start; do not use generic Langham Place query."
+  },
+  "Swallow Street": {
+    "nominatim_query": "10 Swallow Street, London W1B 4DE",
+    "latitude": 51.509276,
+    "longitude": -0.137335,
+    "osm_display_name": "Swallow Street, Mayfair",
+    "notes": "Trans+ Pride route; corrects erroneous Essex geocode."
+  },
+  "Victoria Street": {
+    "nominatim_query": "Victoria Street, Westminster, London SW1",
+    "latitude": 51.496729,
+    "longitude": -0.144706,
+    "osm_display_name": "Victoria Street, Westminster",
+    "notes": "For the Children procession; corrects wrong Victoria Street outside London."
+  }
+}
