@@ -2,7 +2,8 @@
 """Per-event context features: calendar, daylight, weather and media salience.
 
 Input:
- --events     seed/events.csv (event_date, start_or_assembly_time, optional `cause`)
+ --events     seed/events.csv (event_date, start_time; `cause` if present, otherwise
+              derived from motivation/organiser/event_name with CAUSE_KEYWORDS)
  --weather    raw/weather/hourly.csv (download_weather.py)
  --pageviews  raw/pageviews/daily.csv (download_pageviews.py)
  --school-holidays seed/school_holidays.csv (optional, hand-filled)
@@ -31,7 +32,27 @@ TZ = ZoneInfo('Europe/London')
 BANK_HOLIDAYS_URL = 'https://www.gov.uk/bank-holidays.json'
 DEFAULT_START = dt.time(12, 0)  # Typical Saturday march assembly time
 WEATHER_WINDOW_H = 4
-FIELDS = ['event_id', 'event_date', 'cause', 'start_time', 'start_time_imputed',
+# First match wins, so counter-protests are classed before the causes they oppose.
+CAUSE_KEYWORDS = [
+    ('anti_racism', ['stand up to racism', 'counter-protest', 'counter-march', 'against the far', 'anti-racism', 'together alliance']),
+    ('palestine', ['gaza', 'palestin', 'nakba', 'al quds', 'israel', 'rafah']),
+    ('iran', ['iran']),
+    ('anti_trump', ['trump']),
+    ('far_right', ['unite the kingdom', 'uniting the kingdom', 'anti-immigration', 'tommy robinson']),
+    ('climate_nature', ['nature', 'climate']),
+    ('trade_union', ['cost of living', 'trades union', 'tuc']),
+    ('digital_id', ['digital id']),
+    ('animal_rights', ['animal']),
+    ('sudan', ['sudan']),
+    ('ethiopia', ['amhara', 'ethiopia']),
+    ('armenia', ['armenian']),
+    ('kashmir', ['kashmir', 'awami']),
+    ('ukraine', ['ukrain', 'vyshyvanka']),
+    ('trans_rights', ['trans+', 'trans pride', 'transgender']),
+    ('lgbtq', ['pride', 'lesbian']),
+    ('education', ['student', 'universit', 'academ']),
+]
+FIELDS = ['event_id', 'event_date', 'cause', 'cause_derived', 'start_time', 'start_time_imputed',
           'day_of_week', 'is_weekend', 'is_bank_holiday', 'is_school_holiday', 'is_ramadan',
           'sunrise', 'sunset', 'daylight_after_start_h',
           'weather_source', 'precip_mm_4h', 'temp_mean_c', 'apparent_temp_mean_c', 'wind_gust_max_kmh', 'cloud_mean_pct',
@@ -50,6 +71,11 @@ def parse_start(value):
         return DEFAULT_START, True
 
 
+def derive_cause(event):
+    text = ' '.join(event.get(k) or '' for k in ('motivation', 'organiser', 'event_name')).lower()
+    return next((cause for cause, words in CAUSE_KEYWORDS if any(w in text for w in words)), '')
+
+
 def is_ramadan(day):
     return Gregorian(day.year, day.month, day.day).to_hijri().month == 9
 
@@ -60,8 +86,12 @@ def load_bank_holidays(cache, offline):
         if offline:
             print(f'WARNING: {cache} missing and --offline set; is_bank_holiday left empty')
             return None
-        r = requests.get(BANK_HOLIDAYS_URL, timeout=30)
-        r.raise_for_status()
+        try:
+            r = requests.get(BANK_HOLIDAYS_URL, timeout=30)
+            r.raise_for_status()
+        except requests.RequestException as exc:
+            print(f'WARNING: could not download bank holidays ({exc.__class__.__name__}); is_bank_holiday left empty')
+            return None
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_text(r.text, encoding='utf-8')
     data = json.loads(cache.read_text(encoding='utf-8'))
@@ -129,10 +159,13 @@ def salience(series, day):
 
 def build_row(event, cause_column, bank_holidays, school_holidays, weather, pageviews):
     day = dt.date.fromisoformat(event['event_date'])
-    start, imputed = parse_start(event.get('start_or_assembly_time'))
+    start, imputed = parse_start(event.get('start_time') or event.get('start_or_assembly_time'))
     sunrise, sunset, after = daylight(day, start)
     cause = (event.get(cause_column) or '').strip()
-    row = {'event_id': event['event_id'], 'event_date': day.isoformat(), 'cause': cause,
+    derived = not cause
+    if derived:
+        cause = derive_cause(event)
+    row = {'event_id': event['event_id'], 'event_date': day.isoformat(), 'cause': cause, 'cause_derived': derived,
            'start_time': start.strftime('%H:%M'), 'start_time_imputed': imputed,
            'day_of_week': day.strftime('%A'), 'is_weekend': day.weekday() >= 5,
            'is_bank_holiday': None if bank_holidays is None else day in bank_holidays,
@@ -157,7 +190,7 @@ def main():
     a = p.parse_args()
     events = read_csv(a.events)
     if events and a.cause_column not in events[0]:
-        print(f'WARNING: events.csv has no `{a.cause_column}` column yet; salience columns left empty')
+        print(f'No `{a.cause_column}` column in events.csv; deriving cause from motivation/organiser/event_name')
     weather = index_weather(read_csv(a.weather)) if Path(a.weather).exists() else {}
     if not weather: print(f'WARNING: {a.weather} missing; weather columns left empty')
     pageviews = index_pageviews(read_csv(a.pageviews)) if Path(a.pageviews).exists() else {}

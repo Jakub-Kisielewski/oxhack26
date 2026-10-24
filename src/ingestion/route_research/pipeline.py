@@ -33,6 +33,7 @@ STEPS: dict[str, tuple[str, list[str]]] = {
     'ghsl': ('sources/download_ghsl.py', []),
     'geocode': ('processing/review_geocode_waypoints.py', ['geocode', '--waypoints', 'seed/waypoints.csv', '--review', 'coordinate_review.csv']),
     'geocode-route': ('processing/review_geocode_waypoints.py', ['build', '--waypoints', 'seed/waypoints.csv', '--review', 'coordinate_review.csv']),
+    'seed-coords': ('processing/seed_coordinates.py', []),
     'normalize': ('processing/normalize.py', []),
     'next-street': ('processing/next_street_demo.py', []),
     'sample-ghsl': ('processing/sample_ghsl.py', []),

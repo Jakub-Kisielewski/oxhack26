@@ -55,11 +55,21 @@ This should finish in under a second and print the tables: `crimes`, `grid_cells
 
 #### Load data
 
-Either run the ingestion scripts yourself:
+One command runs every ingestion step in the right order:
 
 ```bash
-python -m src.{waiting for global ingestion script}
+python ingest.py              # everything
+python ingest.py --list       # see the steps and their dependencies
+python ingest.py --only weather event-context
+python ingest.py --skip crawl
+python ingest.py --refresh    # re-download cached map data (boundary, osm, landmarks, police)
 ```
+
+Route and context data goes to `data/route_research/`, crawler runs to `data/runs/`.
+If a step fails, the steps that depend on it are skipped, the others still run,
+and a summary is printed at the end. ACLED only runs when `ACLED_EMAIL` and
+`ACLED_PASSWORD` are set (or with `--acled-file path/to/export.csv`).
+See `src/ingestion/route_research/README.md` for what each step writes.
 
 ### Run the app
 ```bash

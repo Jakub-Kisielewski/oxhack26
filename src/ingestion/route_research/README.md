@@ -65,6 +65,17 @@ python -m src.ingestion.route_research.pipeline normalize
 python -m src.ingestion.route_research.pipeline export-parquet
 ```
 
+### Running everything
+
+`python ingest.py` at the repo root runs all of the steps below (plus the
+Tier 1 crawler and DuckDB schema) in dependency order. The individual
+commands here are for re-running a single step.
+
+`seed-coords` builds `coordinate_review.csv` from the reviewed geocodes in
+`seed/geocode_cache.json` and `seed/waypoint_geocode_overrides.json`, so the
+manual `geocode` review pass is no longer needed. Add any new waypoint names
+to the overrides file.
+
 ### Zones 1-2 area, landmarks and per-event context
 
 ```bash
@@ -79,9 +90,11 @@ python -m src.ingestion.route_research.pipeline pageviews
 python -m src.ingestion.route_research.pipeline event-context
 ```
 
-Salience features need a `cause` column in `seed/events.csv` whose values
-match the `cause` keys in `seed/cause_articles.csv` (e.g. `palestine`,
-`far_right`, `climate_nature`). Until it exists, those columns stay empty.
+Salience features match each event's cause to the `cause` keys in
+`seed/cause_articles.csv` (e.g. `palestine`, `far_right`, `climate_nature`).
+A `cause` column in `seed/events.csv` is used if present; otherwise the cause is
+derived from `motivation`/`organiser`/`event_name` with `CAUSE_KEYWORDS` in
+`processing/event_context.py`.
 `seed/school_holidays.csv` is an empty template: fill in
 `start_date,end_date,name` rows to get `is_school_holiday`.
 

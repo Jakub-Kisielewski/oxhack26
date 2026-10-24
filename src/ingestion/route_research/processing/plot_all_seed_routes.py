@@ -4,7 +4,7 @@
 Geocodes unique waypoint names via Nominatim (cached on disk). Orange paths are
 shortest walk routes between consecutive snapped nodes — not official polylines.
 
-    python -m src.ingestion.protest_routes.processing.plot_all_seed_routes \\
+    python -m src.ingestion.route_research.processing.plot_all_seed_routes \\
         --graph raw/osm/london_walk.graphml \\
         --output testing/all_seed_routes.png
 """
@@ -23,8 +23,8 @@ from geopy.extra.rate_limiter import RateLimiter
 from geopy.geocoders import Nominatim
 
 LONDON_VIEWBOX = [(51.44, -0.29), (51.57, 0.06)]
-DEFAULT_CACHE = Path("src/ingestion/protest_routes/seed/geocode_cache.json")
-DEFAULT_OVERRIDES = Path("src/ingestion/protest_routes/seed/waypoint_geocode_overrides.json")
+DEFAULT_CACHE = Path("src/ingestion/route_research/seed/geocode_cache.json")
+DEFAULT_OVERRIDES = Path("src/ingestion/route_research/seed/waypoint_geocode_overrides.json")
 
 
 def in_london(lat: float, lon: float) -> bool:
@@ -152,7 +152,7 @@ def route_for_event(
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--waypoints", default="src/ingestion/protest_routes/seed/waypoints.csv")
+    p.add_argument("--waypoints", default="src/ingestion/route_research/seed/waypoints.csv")
     p.add_argument("--graph", default="raw/osm/london_walk.graphml")
     p.add_argument("--geocode-cache", default=str(DEFAULT_CACHE))
     p.add_argument("--geocode-overrides", default=str(DEFAULT_OVERRIDES))
