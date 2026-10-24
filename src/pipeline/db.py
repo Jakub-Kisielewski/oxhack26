@@ -199,6 +199,30 @@ def all_cameras(con: sqlite3.Connection) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+def active_cameras(con: sqlite3.Connection, tiers: Iterable[int]) -> list[dict[str, Any]]:
+    """Active cameras in the given tiers (what the poller polls)."""
+    tiers = tuple(tiers)
+    if not tiers:
+        return []
+    marks = ", ".join("?" for _ in tiers)
+    rows = con.execute(
+        f"""SELECT camera_id, name, lat, lon, image_url, video_url, tier FROM cameras
+            WHERE active = 1 AND tier IN ({marks}) ORDER BY camera_id""",
+        tiers,
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_camera(con: sqlite3.Connection, camera_id: str) -> dict[str, Any] | None:
+    row = con.execute("SELECT * FROM cameras WHERE camera_id = ?", (camera_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def set_homography(con: sqlite3.Connection, camera_id: str, homography_json: str | None) -> None:
+    """Store (or clear, with None) a camera's calibration JSON."""
+    con.execute("UPDATE cameras SET homography = ? WHERE camera_id = ?", (homography_json, camera_id))
+
+
 def camera_tiers(con: sqlite3.Connection) -> dict[str, int]:
     """{camera_id: tier} for every registered camera."""
     return {r["camera_id"]: r["tier"] for r in con.execute("SELECT camera_id, tier FROM cameras")}
