@@ -13,12 +13,16 @@
   - **1** = central box: clips, polled every 15 s (`TIER1_KIND`, `TIER1_POLL_SECONDS`; promoted from stills after
     Step 5 showed < 1% worker load).
   - **0** = rest of zones 1–2: stills, polled every 60 s (`TIER0_ENABLED`, `TIER0_KIND`, `TIER0_POLL_SECONDS`).
-  Each tier has its own polling loop and interval; all share one `requests.Session` and a bounded HEAD pool ordered
-  by tier, so tier 2 never waits behind other tiers. A loop never overlaps itself: an overrun skips the missed ticks
-  and logs `tier N overran`. Rounds are recorded in `poll_rounds` (duration, bytes, overrun). Tier assignment is
-  configurable via overrides.
-- **LAG:** `LAG_SECONDS=60` for clips, `STILL_LAG_SECONDS=90` for stills (Step 5: frame → observation is bounded by
-  the poll interval, not processing).
+  Each tier has its own polling loop and interval; all share one `requests.Session` and a bounded pool of
+  `HEAD_THREADS` (16), of which `TIER2_RESERVED_THREADS` (4) serve tier 2 only and the rest run any tier in priority
+  order, so tier 2 never waits behind other tiers. A loop never overlaps itself: an overrun skips the missed ticks
+  and logs `tier N overran`. Uploads already older than their kind's LAG are not downloaded (`skipped N too-old
+  uploads`). Bandwidth valve: `VALVE_SLOW_ROUNDS` (2) tier-2 rounds in a row slower than `POLL_SECONDS` pause tier 0
+  for `VALVE_PAUSE_SECONDS` (300); logged, stored in `poller_events`, shown in the sidebar. Rounds are recorded in
+  `poll_rounds` (duration, bytes, too-old, overrun). Tier assignment is configurable via overrides.
+- **LAG:** `LAG_SECONDS=60` for clips, `STILL_LAG_SECONDS=120` for stills (Step 5: frame → observation is bounded by
+  the poll interval, not processing). **Layer 2:** the twin applies observations in event-time order, so it must use
+  one `TWIN_LAG_SECONDS` = max over enabled kinds' lags (`Settings.twin_lag_seconds`, 120 with tier 0 stills on).
 - **Schema additions (Step 1):** `clips.kind` (`clip` | `still`), `clips.attempts` (a clip whose claim expires
   `MAX_ATTEMPTS` times is failed, not requeued forever), `clips.finished_at` (for seconds per chunk), and
   `clips.path` is nullable since bytes live in `clips.data`. `observations` also carries `chunk_index` and `kind`.

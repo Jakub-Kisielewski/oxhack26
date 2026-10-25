@@ -54,6 +54,10 @@ class Settings:
     tier0_kind: str = "still"
     tier0_poll_seconds: int = 60
     head_threads: int = 16
+    tier2_reserved_threads: int = 4   # of head_threads, serve tier 2 only
+    # bandwidth safety valve: this many tier-2 rounds in a row slower than POLL_SECONDS pause tier 0
+    valve_slow_rounds: int = 2
+    valve_pause_seconds: int = 300
     stale_after_s: int = 900
     chunk_seconds: int = 15
     # detection / features
@@ -67,7 +71,7 @@ class Settings:
     max_attempts: int = 3
     # twin: rows are late if written more than LAG after frame_time; stills are polled less often
     lag_seconds: int = 60
-    still_lag_seconds: int = 90
+    still_lag_seconds: int = 120
     twin_tick_seconds: int = 15
 
     def tier_description(self, tier: int) -> str:
@@ -81,8 +85,22 @@ class Settings:
         return f"{area}: {polling[1]}s every {polling[2]:g} s"
 
     def lag_for(self, kind: str) -> int:
-        """LAG for observations of this media kind."""
+        """LAG for observations of this media kind; uploads older than this are not downloaded."""
         return self.still_lag_seconds if kind == "still" else self.lag_seconds
+
+    @property
+    def enabled_kinds(self) -> set[str]:
+        kinds = {"clip"}
+        if self.tier1_enabled:
+            kinds.add(self.tier1_kind)
+        if self.tier0_enabled:
+            kinds.add(self.tier0_kind)
+        return kinds
+
+    @property
+    def twin_lag_seconds(self) -> int:
+        """The twin's single LAG: it applies observations in event-time order, so it waits for the slowest kind."""
+        return max(self.lag_for(k) for k in self.enabled_kinds)
 
     @property
     def route_lines(self) -> tuple[tuple[tuple[float, float], ...], ...]:
@@ -106,6 +124,9 @@ _PARSERS = {
     "TIER0_KIND": ("tier0_kind", str),
     "TIER0_POLL_SECONDS": ("tier0_poll_seconds", int),
     "HEAD_THREADS": ("head_threads", int),
+    "TIER2_RESERVED_THREADS": ("tier2_reserved_threads", int),
+    "VALVE_SLOW_ROUNDS": ("valve_slow_rounds", int),
+    "VALVE_PAUSE_SECONDS": ("valve_pause_seconds", int),
     "STALE_AFTER_S": ("stale_after_s", int),
     "CHUNK_SECONDS": ("chunk_seconds", int),
     "SAMPLE_FPS": ("sample_fps", float),

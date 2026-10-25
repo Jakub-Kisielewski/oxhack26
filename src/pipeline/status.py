@@ -69,7 +69,7 @@ def round_summary(rounds: list[dict[str, Any]], window_s: float) -> dict[int, di
         secs = [r["seconds"] for r in rs]
         out[tier] = {"rounds": len(rs), "median_s": statistics.median(secs), "max_s": max(secs),
                      "overruns": sum(r["overran"] for r in rs), "kb_per_s": sum(r["bytes"] or 0 for r in rs) / 1024 / window_s,
-                     "kind": rs[0]["kind"]}
+                     "too_old": sum(r.get("too_old") or 0 for r in rs), "kind": rs[0]["kind"]}
     return out
 
 
@@ -103,11 +103,14 @@ def report(con, minutes: int = 10, now: datetime | None = None,
     summary = round_summary(rounds, minutes * 60) if rounds else {}
     for tier, r in summary.items():
         lines.append(f"tier {tier} {r['kind']} rounds: {r['rounds']}, median {r['median_s']:.1f} s, max {r['max_s']:.1f} s, "
-                     f"overruns {r['overruns']}, {r['kb_per_s']:.1f} KB/s")
+                     f"overruns {r['overruns']}, {r['kb_per_s']:.1f} KB/s, too-old skipped {r['too_old']}")
     if summary:
         lines.append(f"network (media downloads, all tiers): {sum(r['kb_per_s'] for r in summary.values()):.1f} KB/s")
     for (tier, kind), (n, total) in late_counts(timings, lag_for).items():
         lines.append(f"late at LAG {lag_for(kind):g} s: tier {tier} {kind} {n}/{total}")
+    for e in db.poller_events_since(con, now - timedelta(minutes=minutes)):
+        lines.append(f"event {e['at']}: {e['event']}" + (f" until {e['until']}" if e["until"] else "")
+                     + (f" ({e['detail']})" if e["detail"] else ""))
     for b in bursts(timings):
         lines.append(f"burst {b['start']}: {b['chunks']} chunks {'+'.join(b['kinds'])}, enqueued over "
                      f"{b['enqueue_span_s']:.0f} s, drained in {b['drain_s']:.0f} s")

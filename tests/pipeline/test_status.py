@@ -35,13 +35,14 @@ def test_late_counts_per_tier_use_the_lag_for_each_kind():
 
 
 def test_round_summary_per_tier():
-    rounds = [{"tier": 2, "kind": "clip", "seconds": s, "overran": o, "bytes": b}
+    rounds = [{"tier": 2, "kind": "clip", "seconds": s, "overran": o, "bytes": b, "too_old": 1}
               for s, o, b in [(0.5, 0, 102400), (0.7, 0, 0), (16.0, 1, 204800)]]
     rounds.append({"tier": 0, "kind": "still", "seconds": 3.0, "overran": 0, "bytes": 61440})
     out = status.round_summary(rounds, window_s=60)
     assert out[2]["rounds"] == 3 and out[2]["median_s"] == 0.7 and out[2]["max_s"] == 16.0
     assert out[2]["overruns"] == 1 and out[2]["kb_per_s"] == pytest.approx(5.0)
     assert out[0]["kb_per_s"] == pytest.approx(1.0)
+    assert out[2]["too_old"] == 3 and out[0]["too_old"] == 0
 
 
 def test_report_on_a_live_db(con):
@@ -54,7 +55,9 @@ def test_report_on_a_live_db(con):
     db.record_poll_round(con, {"tier": 2, "kind": "clip", "started_at": T0 + timedelta(seconds=19), "seconds": 0.8,
                                "checked": 1, "new": 1, "enqueued": 1, "bytes": 30720, "overran": False})
     text = status.report(con, minutes=10, now=T0 + timedelta(seconds=60))
-    assert "tier 2 clip rounds: 1, median 0.8 s, max 0.8 s, overruns 0, 0.1 KB/s" in text
+    assert "tier 2 clip rounds: 1, median 0.8 s, max 0.8 s, overruns 0, 0.1 KB/s, too-old skipped 0" in text
+    db.record_poller_event(con, "tier0_paused", until=T0 + timedelta(minutes=5), now=T0 + timedelta(seconds=30))
+    assert "tier0_paused until 2026-10-24T12:05:00+00:00" in status.report(con, minutes=10, now=T0 + timedelta(seconds=60))
     assert "proc clip: n=1 median 150 ms" in text
     assert "frame_to_observation_s: median 22 s" in text
     assert "drained in 2 s" in text

@@ -53,3 +53,15 @@ def load_queue_stats() -> dict[str, Any] | None:
         return db.queue_stats(con)
     finally:
         con.close()
+
+
+@st.cache_data(ttl=10)
+def load_tier0_pause() -> dict[str, Any] | None:
+    """The bandwidth valve's current tier-0 pause, if any."""
+    con = _connect()
+    if con is None:
+        return None
+    try:
+        return db.active_pause(con, "tier0_paused")
+    finally:
+        con.close()

@@ -10,7 +10,7 @@ import requests
 
 from src.pipeline import db
 from src.pipeline.config import Settings
-from src.pipeline.poller import Poller, PriorityPool, TierLoop, check_camera, tier_loops
+from src.pipeline.poller import BandwidthValve, Poller, PriorityPool, TierLoop, check_camera, tier_loops
 from media import make_mp4
 
 NOW = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
@@ -65,7 +65,7 @@ T2 = TierLoop(2, "clip", 15)
 
 @pytest.fixture
 def poller(db_url, con, tfl):
-    p = Poller(replace(Settings(), head_threads=4, db_url=db_url), session=tfl, refresh_registry=False)
+    p = Poller(replace(Settings(), head_threads=8, db_url=db_url), session=tfl, refresh_registry=False)
     yield p
     p.pool.shutdown()
 
@@ -75,16 +75,16 @@ def _clips(con):
 
 
 def test_changed_etag_enqueues_with_last_modified_as_frame_time(poller, tfl, con):
-    tfl.publish("https://tfl/A.mp4", '"e1"', NOW - timedelta(seconds=60))
+    tfl.publish("https://tfl/A.mp4", '"e1"', NOW - timedelta(seconds=30))
     stats = poller.poll_round(con, [_cam("A")], T2, now=NOW)
     assert (stats.new, stats.enqueued) == (1, 1)
     [clip] = _clips(con)
-    assert clip["frame_time"] == db.to_iso(NOW - timedelta(seconds=60))
+    assert clip["frame_time"] == db.to_iso(NOW - timedelta(seconds=30))
     assert (clip["kind"], clip["etag"], clip["data"]) == ("clip", '"e1"', CLIP)
 
 
 def test_unchanged_etag_does_nothing(poller, tfl, con):
-    tfl.publish("https://tfl/A.mp4", '"e1"', NOW - timedelta(seconds=60))
+    tfl.publish("https://tfl/A.mp4", '"e1"', NOW - timedelta(seconds=30))
     poller.poll_round(con, [_cam("A")], T2, now=NOW)
     gets = tfl.gets
     stats = poller.poll_round(con, [_cam("A")], T2, now=NOW + timedelta(seconds=15))
@@ -100,6 +100,20 @@ def test_stale_upload_is_skipped_without_download(poller, tfl, con):
     stats = poller.poll_round(con, [_cam("A")], T2, now=NOW)
     assert (stats.stale, stats.enqueued, tfl.gets) == (1, 0, 0)
     assert _clips(con) == []
+
+
+def test_uploads_older_than_lag_are_not_downloaded(poller, tfl, con, caplog):
+    tfl.publish("https://tfl/A.mp4", '"e1"', NOW - timedelta(seconds=61))   # clip LAG 60
+    tfl.publish("https://tfl/B.mp4", '"e1"', NOW - timedelta(seconds=20))
+    tfl.publish("https://tfl/C.jpg", '"s1"', NOW - timedelta(seconds=100))  # still LAG 120: fresh enough
+    with caplog.at_level(logging.INFO):
+        stats = poller.poll_round(con, [_cam("A"), _cam("B")], T2, now=NOW)
+    assert (stats.too_old, stats.enqueued, tfl.gets) == (1, 1, 1)
+    assert "tier 2: skipped 1 too-old uploads" in caplog.text
+    assert db.poll_rounds_since(con, NOW - timedelta(minutes=1))[0]["too_old"] == 1
+    # remembered: the old upload is not re-checked for download next round
+    assert poller.poll_round(con, [_cam("A")], T2, now=NOW + timedelta(seconds=15)).unchanged == 1
+    assert poller.poll_round(con, [_cam("C", tier=0)], TierLoop(0, "still", 60), now=NOW).enqueued == 1
 
 
 def test_errors_are_counted_and_do_not_stop_the_round(poller, tfl, con):
@@ -135,7 +149,7 @@ def test_check_camera_reports_http_errors():
 
 
 def test_rounds_are_recorded_with_bytes(poller, tfl, con):
-    tfl.publish("https://tfl/A.mp4", '"e1"', NOW - timedelta(seconds=60))
+    tfl.publish("https://tfl/A.mp4", '"e1"', NOW - timedelta(seconds=30))
     poller.poll_round(con, [_cam("A")], T2, now=NOW)
     [r] = db.poll_rounds_since(con, NOW - timedelta(minutes=1))
     assert (r["tier"], r["kind"], r["new"], r["bytes"], r["overran"]) == (2, "clip", 1, len(CLIP), 0)
@@ -162,6 +176,69 @@ def test_priority_pool_runs_tier2_before_queued_lower_tiers():
         f.result(timeout=5)
     pool.shutdown()
     assert order == ["t2-0", "t2-1", "t0-0", "t0-1", "t0-2"]
+
+
+def test_reserved_threads_keep_tier2_running_while_lower_tiers_block():
+    pool = PriorityPool(3, reserved=1)
+    gate, started = threading.Event(), []
+    low = [pool.submit(2, lambda i=i: (started.append(i), gate.wait())) for i in range(4)]
+    time.sleep(0.2)
+    assert len(started) == 2  # the reserved thread never takes tier-0 work
+    assert pool.submit(0, lambda: "tier2").result(timeout=2) == "tier2"  # runs while the others block
+    gate.set()
+    for f in low:
+        f.result(timeout=5)
+    pool.shutdown()
+    with pytest.raises(ValueError):
+        PriorityPool(4, reserved=4)
+
+
+def test_valve_pauses_after_consecutive_slow_tier2_rounds():
+    now = [0.0]
+    valve = BandwidthValve(slow_s=15, slow_rounds=2, pause_s=300, clock=lambda: now[0])
+    assert valve.record_tier2(20) is False          # one slow round
+    assert valve.record_tier2(5) is False           # streak broken
+    assert valve.record_tier2(16) is False
+    assert valve.record_tier2(30) is True and valve.is_paused()
+    now[0] = 299
+    assert valve.is_paused() and valve.record_tier2(40) is False and valve.record_tier2(40) is False
+    now[0] = 301
+    assert not valve.is_paused()
+
+
+def test_tier0_loop_skips_rounds_while_paused(db_url, con, tfl, caplog):
+    db.upsert_cameras(con, [_cam("C", tier=0)])
+    tfl.publish("https://tfl/C.jpg", '"s"', db.utc_now(), b"jpeg")
+    p = Poller(replace(Settings(), db_url=db_url), session=tfl, refresh_registry=False)
+    p.valve.paused_until = time.monotonic() + 0.6
+    t = threading.Thread(target=p.tier_loop, args=(TierLoop(0, "still", 0.2),))
+    with caplog.at_level(logging.INFO):
+        t.start()
+        time.sleep(0.4)
+        assert db.poll_rounds_since(con, db.utc_now() - timedelta(minutes=1)) == []  # paused: no rounds
+        time.sleep(0.6)
+        p.stop_event.set()
+        t.join(timeout=5)
+    p.pool.shutdown()
+    assert db.poll_rounds_since(con, db.utc_now() - timedelta(minutes=1))  # resumed
+    assert "tier 0 resumed" in caplog.text
+
+
+def test_slow_tier2_rounds_record_a_pause_event(db_url, con, caplog):
+    tfl = SlowTfL()
+    db.upsert_cameras(con, [_cam("A")])
+    tfl.publish("https://tfl/A.mp4", '"e"', db.utc_now())
+    s = replace(Settings(), db_url=db_url, poll_seconds=0.1, valve_pause_seconds=60)
+    p = Poller(s, session=tfl, refresh_registry=False)
+    t = threading.Thread(target=p.tier_loop, args=(TierLoop(2, "clip", 0.1),))
+    with caplog.at_level(logging.WARNING):
+        t.start()
+        time.sleep(1.0)
+        p.stop_event.set()
+        t.join(timeout=5)
+    p.pool.shutdown()
+    assert "tier 0 paused for 60 s (bandwidth)" in caplog.text
+    assert db.active_pause(con)["event"] == "tier0_paused"
 
 
 def test_run_once_polls_every_enabled_tier_with_its_kind(db_url, con, tfl):

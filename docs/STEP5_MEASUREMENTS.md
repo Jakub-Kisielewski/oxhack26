@@ -87,3 +87,21 @@ Steady-state network: ~58 KB/s of media (all tiers), on a connection that manage
   late). On a slow link that saturates the 16 HEAD threads and the bandwidth, and even tier 2 rounds stretched to
   45 s: the priority pool orders waiting tasks but cannot preempt running downloads.
 - **Tier 0:** frame → observation reaches 102 s (60 s poll + rounds up to 54 s), so 7% of stills are late at 90 s.
+
+## Run 3: too-old skip, 4 reserved tier-2 threads, STILL_LAG 120, bandwidth valve (00:10–00:20 UTC, 25 Oct)
+
+| | Tier 2 clips | Tier 1 clips | Tier 0 stills |
+|---|---|---|---|
+| **Whole run**: rounds, median / max | 40, 1.2 / 16.4 s | 36, 3.1 / 35.2 s | 9, 11.6 / 85.9 s |
+| overruns | 1 | 4 | 2 |
+| media download | 2.3 KB/s | 31.7 KB/s | 15.5 KB/s |
+| too-old uploads skipped | 4 | 82 | 121 |
+| late (LAG 60 / 60 / 120 s) | 1/13 | 24/180 | 126/587 |
+| **After 4 min**: late | 0/7 | 0/106 | 34/316 |
+| frame → observation median / max | 12 / 29 s | 28 / 53 s | 87 / 139 s |
+
+- Reserved threads work: tier 2 max round 16.4 s (45 s in run 2), 9.1 s during startup.
+- The valve never triggered (only one tier-2 round over 15 s).
+- **Remaining lateness is a poller flaw:** a round enqueues its downloads only after the whole round finishes
+  (587 tier-0 stills share 5 enqueue timestamps). A still downloaded early in an 86 s round waits ~80 s to be
+  enqueued, and uploads just under the LAG at HEAD time are certain to be late after that wait.

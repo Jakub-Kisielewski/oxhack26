@@ -6,7 +6,7 @@ import pandas as pd
 import pydeck as pdk
 import streamlit as st
 
-from src.ui.live_data import load_cameras, load_history, load_queue_stats
+from src.ui.live_data import load_cameras, load_history, load_queue_stats, load_tier0_pause
 from src.ui.live_display import DECK_COLUMNS, age_text, cache_buster, prepare, tier_label
 
 st.title("Live cameras: zones 1 & 2")
@@ -19,6 +19,10 @@ def sidebar_stats() -> None:
     if stats is None:
         st.caption("No pipeline DB yet.")
         return
+    pause = load_tier0_pause()
+    if pause:
+        until = pd.Timestamp(pause["until"]).tz_convert("Europe/London").strftime("%H:%M")
+        st.warning(f"tier 0 paused (bandwidth) until {until}")
     q = stats["by_status"]
     lag = stats["lag_seconds"]
     st.metric("Data lag (newest frame)", age_text(lag) if lag is not None else "n/a",

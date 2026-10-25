@@ -39,6 +39,9 @@ def age_text(seconds: float | None) -> str:
 def prepare(cams: pd.DataFrame, now: datetime) -> pd.DataFrame:
     """Add display columns: reading age, fresh flag, colour (grey = no data, stale or inactive), tooltip text."""
     cams = cams.fillna({"view": "", "name": ""})
+    # all-NULL reading columns (no observations yet) come back as object dtype; force numbers
+    cams = cams.assign(**{c: pd.to_numeric(cams[c], errors="coerce")
+                          for c in ("people", "density", "speed", "heading") if c in cams})
     frame_time = pd.to_datetime(cams["frame_time"], utc=True)
     age_s = (pd.Timestamp(now) - frame_time).dt.total_seconds()
     fresh = cams["people"].notna() & (age_s <= SETTINGS.stale_after_s) & (cams["active"] == 1)

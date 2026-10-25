@@ -61,6 +61,14 @@ def test_prepare_greys_out_missing_stale_and_inactive_readings():
     assert out.loc["fresh", "radius"] > out.loc["off", "radius"] > out.loc["none", "radius"]
 
 
+def test_prepare_handles_no_readings_at_all():
+    rows = pd.DataFrame([{"camera_id": "A", "tier": 2, "active": 1, "people": None, "frame_time": None,
+                          "name": "n", "view": None}])
+    out = prepare(rows, NOW)
+    assert out["people"].dtype.kind == "f" and not out["fresh"].any()
+    assert out[out["fresh"]].nlargest(5, "people").empty
+
+
 def test_cache_buster_follows_the_frame_time():
     row = pd.Series({"frame_time": pd.Timestamp(NOW)})
     assert cache_buster(row) == int(NOW.timestamp())
@@ -95,6 +103,19 @@ def test_load_history_and_queue_stats(pipeline_db):
 
 # ------------------------------------------------------------------- page
 
+def test_tier0_pause_shows_in_sidebar(pipeline_db):
+    db.upsert_cameras(pipeline_db, [_cam("A", 2)])
+    db.record_poller_event(pipeline_db, "tier0_paused", until=db.utc_now() + timedelta(minutes=5))
+    at = AppTest.from_file(str(REPO_ROOT / "src/ui/live_map.py"), default_timeout=30).run()
+    assert not at.exception
+    assert "tier 0 paused (bandwidth)" in at.sidebar.warning[0].value
+
+
+def test_expired_pause_is_not_shown(pipeline_db):
+    db.record_poller_event(pipeline_db, "tier0_paused", until=db.utc_now() - timedelta(seconds=1))
+    assert live_data.load_tier0_pause() is None
+
+
 def test_page_renders_map_sidebar_and_busiest(pipeline_db):
     db.upsert_cameras(pipeline_db, [_cam("A", 2), _cam("B", 1), _cam("C", 0, active=False)])
     db.insert_observation(pipeline_db, {"camera_id": "B", "frame_time": db.utc_now() - timedelta(minutes=1),
@@ -103,5 +124,6 @@ def test_page_renders_map_sidebar_and_busiest(pipeline_db):
     assert not at.exception
     assert at.get("deck_gl_json_chart")
     assert at.sidebar.metric[1].value == "0 / 0"  # queue
+    assert not at.sidebar.warning  # no pause
     busiest = at.dataframe[0].value
     assert list(busiest["name"]) == ["Cam B"] and busiest["people"].iloc[0] == 7

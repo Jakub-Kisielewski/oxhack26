@@ -59,10 +59,15 @@ CREATE INDEX IF NOT EXISTS idx_obs_camera_time ON observations (camera_id, frame
 CREATE TABLE IF NOT EXISTS poll_rounds (    -- one row per poller round, per tier
   tier INTEGER NOT NULL, kind TEXT NOT NULL, started_at TEXT NOT NULL, seconds REAL NOT NULL,
   checked INTEGER, new INTEGER, enqueued INTEGER, unchanged INTEGER, stale INTEGER, errors INTEGER,
+  too_old INTEGER,                          -- uploads older than the kind's LAG, not downloaded
   bytes INTEGER,                            -- media bytes downloaded (GET bodies)
   overran INTEGER NOT NULL DEFAULT 0        -- round took longer than the tier's interval
 );
 CREATE INDEX IF NOT EXISTS idx_poll_rounds_started ON poll_rounds (started_at);
+
+CREATE TABLE IF NOT EXISTS poller_events (  -- e.g. tier 0 paused by the bandwidth valve
+  at TEXT NOT NULL, event TEXT NOT NULL, until TEXT, detail TEXT
+);
 
 CREATE TABLE IF NOT EXISTS station_crowding (naptan TEXT, time TEXT, pct_baseline REAL, ingested_at TEXT,
                                              UNIQUE (naptan, time));
@@ -86,7 +91,8 @@ CREATE VIEW IF NOT EXISTS latest_police_posts AS
 """
 
 # Columns added after a table was first created: init_db adds them to existing DB files.
-ADDED_COLUMNS = {"observations": {"proc_ms": "INTEGER"}, "clips": {"size_bytes": "INTEGER"}}
+ADDED_COLUMNS = {"observations": {"proc_ms": "INTEGER"}, "clips": {"size_bytes": "INTEGER"},
+                 "poll_rounds": {"too_old": "INTEGER"}}
 
 CAMERA_COLUMNS = ("camera_id", "name", "lat", "lon", "view", "image_url", "video_url", "tier")
 OBSERVATION_COLUMNS = (
@@ -381,7 +387,7 @@ def pipeline_timings(con: sqlite3.Connection, since: datetime | str) -> list[dic
 
 
 POLL_ROUND_COLUMNS = ("tier", "kind", "started_at", "seconds", "checked", "new", "enqueued", "unchanged",
-                      "stale", "errors", "bytes", "overran")
+                      "stale", "errors", "too_old", "bytes", "overran")
 
 
 def record_poll_round(con: sqlite3.Connection, round_: Mapping[str, Any]) -> None:
@@ -397,6 +403,25 @@ def poll_rounds_since(con: sqlite3.Connection, since: datetime | str) -> list[di
     rows = con.execute("SELECT * FROM poll_rounds WHERE started_at >= ? ORDER BY started_at",
                        (to_iso(since),)).fetchall()
     return [dict(r) for r in rows]
+
+
+def record_poller_event(con: sqlite3.Connection, event: str, until: datetime | None = None, detail: str = "",
+                        now: datetime | None = None) -> None:
+    con.execute("INSERT INTO poller_events (at, event, until, detail) VALUES (?, ?, ?, ?)",
+                (to_iso(now or utc_now()), event, to_iso(until) if until else None, detail))
+
+
+def poller_events_since(con: sqlite3.Connection, since: datetime | str) -> list[dict[str, Any]]:
+    rows = con.execute("SELECT * FROM poller_events WHERE at >= ? ORDER BY at", (to_iso(since),)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def active_pause(con: sqlite3.Connection, event: str = "tier0_paused",
+                 now: datetime | None = None) -> dict[str, Any] | None:
+    """The latest `event` whose `until` is still in the future, if any."""
+    row = con.execute("SELECT * FROM poller_events WHERE event = ? AND until > ? ORDER BY at DESC LIMIT 1",
+                      (event, to_iso(now or utc_now()))).fetchone()
+    return dict(row) if row else None
 
 
 def queue_stats(con: sqlite3.Connection, window_minutes: int = 10,

@@ -7,10 +7,11 @@ def test_defaults_when_env_empty():
     s = load_settings({})
     assert s == Settings()
     assert s.route_points == DEFAULT_ROUTE_POINTS
-    assert (s.sample_fps, s.lag_seconds, s.still_lag_seconds) == (2.0, 60, 90)
+    assert (s.sample_fps, s.lag_seconds, s.still_lag_seconds) == (2.0, 60, 120)
     assert (s.tier1_enabled, s.tier1_kind, s.tier1_poll_seconds) == (True, "clip", 15)
     assert (s.tier0_enabled, s.tier0_kind, s.tier0_poll_seconds) == (True, "still", 60)
-    assert (s.lag_for("clip"), s.lag_for("still")) == (60, 90)
+    assert (s.lag_for("clip"), s.lag_for("still")) == (60, 120)
+    assert (s.tier2_reserved_threads, s.valve_slow_rounds, s.valve_pause_seconds) == (4, 2, 300)
 
 
 def test_env_overrides():
@@ -45,3 +46,9 @@ def test_tier_description_follows_poller_settings():
     off = load_settings({"TIER0_ENABLED": "false", "TIER1_KIND": "still", "TIER1_POLL_SECONDS": "60"})
     assert off.tier_description(0) == "rest of zones 1-2: not polled"
     assert off.tier_description(1) == "central box: stills every 60 s"
+
+
+def test_twin_lag_is_the_max_over_enabled_kinds():
+    assert load_settings({}).twin_lag_seconds == 120  # tier 0 stills enabled
+    assert load_settings({"TIER0_ENABLED": "false"}).twin_lag_seconds == 60  # clips only
+    assert load_settings({"TIER0_KIND": "clip"}).twin_lag_seconds == 60
