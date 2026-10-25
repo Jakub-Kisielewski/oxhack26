@@ -46,13 +46,18 @@ TABLES = {
 }
 
 
+# Infer column types from the whole file, not the first ~20k rows: a value that
+# only appears late (e.g. text in a mostly numeric column) otherwise fails the load.
+CSV_OPTIONS = "header = true, sample_size = -1"
+
+
 def quote(path: Path) -> str:
     return "'" + path.as_posix().replace("'", "''") + "'"
 
 
 def reader_sql(path: Path, reader: str) -> str:
     if reader == "csv":
-        return f"SELECT * FROM read_csv({quote(path)}, header = true)"
+        return f"SELECT * FROM read_csv({quote(path)}, {CSV_OPTIONS})"
     if reader == "geojson":
         return f"SELECT * FROM ST_Read({quote(path)})"
     return f"SELECT * FROM read_parquet({quote(path)})"
@@ -84,7 +89,7 @@ def segments_sql(route_dir: Path) -> str | None:
     if not feats.exists():
         return reader_sql(geo, "geojson")
     return (f"SELECT g.*, COALESCE(f.n_published_route_examples, 0) AS n_published_route_examples "
-            f"FROM ST_Read({quote(geo)}) g LEFT JOIN read_csv({quote(feats)}, header = true) f USING (segment_id)")
+            f"FROM ST_Read({quote(geo)}) g LEFT JOIN read_csv({quote(feats)}, {CSV_OPTIONS}) f USING (segment_id)")
 
 
 def plan(route_dir: Path, runs_dir: Path) -> dict[str, tuple[Path | None, str | None]]:
