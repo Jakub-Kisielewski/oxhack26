@@ -46,7 +46,11 @@ CREATE TABLE IF NOT EXISTS observations (
   kind TEXT NOT NULL DEFAULT 'clip',
   ingested_at TEXT NOT NULL,
   lat REAL, lon REAL, h3 TEXT,
-  people REAL, density REAL,                -- people/m², NULL if camera uncalibrated
+  people REAL,                              -- bias-corrected count (config/count_correction.json)
+  raw_people REAL,                          -- detector count aggregated over the clip (median | p75)
+  count_sd REAL,                            -- uncertainty of people; larger in low light
+  luma REAL,                                -- mean grey level of the middle frame
+  density REAL,                             -- people/m², NULL if camera uncalibrated
   speed REAL, heading REAL,                 -- m/s, degrees from north; NULL if no flow
   quality TEXT,                             -- ok | blank | dark | reaimed | stale
   proc_version TEXT,
@@ -91,13 +95,14 @@ CREATE VIEW IF NOT EXISTS latest_police_posts AS
 """
 
 # Columns added after a table was first created: init_db adds them to existing DB files.
-ADDED_COLUMNS = {"observations": {"proc_ms": "INTEGER"}, "clips": {"size_bytes": "INTEGER"},
+ADDED_COLUMNS = {"observations": {"proc_ms": "INTEGER", "raw_people": "REAL", "count_sd": "REAL", "luma": "REAL"},
+                 "clips": {"size_bytes": "INTEGER"},
                  "poll_rounds": {"too_old": "INTEGER"}}
 
 CAMERA_COLUMNS = ("camera_id", "name", "lat", "lon", "view", "image_url", "video_url", "tier")
 OBSERVATION_COLUMNS = (
     "camera_id", "frame_time", "chunk_index", "kind", "ingested_at", "lat", "lon", "h3",
-    "people", "density", "speed", "heading", "quality", "proc_version", "proc_ms",
+    "people", "raw_people", "count_sd", "luma", "density", "speed", "heading", "quality", "proc_version", "proc_ms",
 )
 STATUSES = ("pending", "processing", "done", "failed")
 
@@ -345,7 +350,8 @@ def latest_observation_per_camera(con: sqlite3.Connection, since_minutes: int = 
     rows = con.execute(
         f"""SELECT c.camera_id, c.name, c.lat, c.lon, c.view, c.image_url, c.video_url, c.tier, c.active,
                   c.homography IS NOT NULL AS calibrated,
-                  o.frame_time, o.ingested_at, o.kind, o.people, o.density, o.speed, o.heading, o.quality
+                  o.frame_time, o.ingested_at, o.kind, o.people, o.raw_people, o.count_sd, o.density, o.speed,
+                  o.heading, o.quality
            FROM cameras c
            LEFT JOIN (
              SELECT *, ROW_NUMBER() OVER (PARTITION BY camera_id
@@ -364,7 +370,7 @@ def camera_history(con: sqlite3.Connection, camera_id: str, minutes: int = 60,
     """One camera's observations from the last `minutes`, oldest first."""
     cutoff = to_iso((now or utc_now()) - timedelta(minutes=minutes))
     rows = con.execute(
-        """SELECT frame_time, kind, people, density, speed, heading, quality FROM observations
+        """SELECT frame_time, kind, people, raw_people, count_sd, density, speed, heading, quality FROM observations
            WHERE camera_id = ? AND frame_time >= ? ORDER BY frame_time, chunk_index""",
         (camera_id, cutoff),
     ).fetchall()

@@ -1,12 +1,14 @@
 """Pipeline settings, read from environment variables with defaults; shared by every process."""
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+DETECTOR_CONFIG_PATH = REPO_ROOT / "config" / "detector.json"  # written by scripts/bench_detect.py --write-config
 
 # JAMCAM.md DEFAULT_BBOX (lat_min, lon_min, lat_max, lon_max). Defined here rather than imported from
 # jamcam_poller so that the UI, which imports db -> config, never imports poller code.
@@ -66,12 +68,21 @@ class Settings:
     yolo_conf: float = 0.25
     yolo_imgsz: int = 640
     yolo_device: str = ""  # "" = auto (mps > cuda > cpu)
+    yolo_sahi: bool = False          # SAHI sliced inference
+    sahi_slice: int = 192            # slice size in px (352x288 frames -> 2x2 slices with overlap)
+    count_agg: str = "median"        # aggregation of per-frame counts over a clip: median | p75
+    min_box_h: float = 8.0           # drop person boxes shorter than this (px)
+    banner_top_px: float = 0.0       # TfL overlay strips on 352x288 frames (see docs/STEP5_MEASUREMENTS.md)
+    banner_bottom_px: float = 0.0
+    low_luma: float = 50.0           # mean grey level below this = low light: count_sd x dark_sd_factor
+    dark_sd_factor: float = 2.0
     # queue
     claim_timeout_s: int = 300
     max_attempts: int = 3
     # twin: rows are late if written more than LAG after frame_time; stills are polled less often
     lag_seconds: int = 60
     still_lag_seconds: int = 120
+    too_old_margin_s: int = 10       # don't download uploads older than LAG - margin (processing must fit)
     twin_tick_seconds: int = 15
 
     def tier_description(self, tier: int) -> str:
@@ -134,17 +145,41 @@ _PARSERS = {
     "YOLO_CONF": ("yolo_conf", float),
     "YOLO_IMGSZ": ("yolo_imgsz", int),
     "YOLO_DEVICE": ("yolo_device", str),
+    "YOLO_SAHI": ("yolo_sahi", _bool),
+    "SAHI_SLICE": ("sahi_slice", int),
+    "COUNT_AGG": ("count_agg", str),
+    "MIN_BOX_H": ("min_box_h", float),
+    "BANNER_TOP_PX": ("banner_top_px", float),
+    "BANNER_BOTTOM_PX": ("banner_bottom_px", float),
+    "LOW_LUMA": ("low_luma", float),
+    "DARK_SD_FACTOR": ("dark_sd_factor", float),
     "CLAIM_TIMEOUT_S": ("claim_timeout_s", int),
     "MAX_ATTEMPTS": ("max_attempts", int),
     "LAG_SECONDS": ("lag_seconds", int),
     "STILL_LAG_SECONDS": ("still_lag_seconds", int),
+    "TOO_OLD_MARGIN_S": ("too_old_margin_s", int),
     "TWIN_TICK_SECONDS": ("twin_tick_seconds", int),
 }
 
 
-def load_settings(env: Mapping[str, str] = os.environ) -> Settings:
-    """Build Settings from env vars named as in _PARSERS; unset vars keep their defaults."""
-    kwargs = {attr: parse(env[name]) for name, (attr, parse) in _PARSERS.items() if env.get(name)}
+DETECTOR_KEYS = ("yolo_model", "yolo_imgsz", "yolo_conf", "yolo_sahi", "sahi_slice", "count_agg", "min_box_h")
+
+
+def load_detector_config(path: Path = DETECTOR_CONFIG_PATH) -> dict:
+    """The benchmarked detector settings ({setting: value} for DETECTOR_KEYS); {} if there is no file."""
+    if not path.exists():
+        return {}
+    raw = json.loads(path.read_text())
+    unknown = set(raw) - set(DETECTOR_KEYS)
+    if unknown:
+        raise ValueError(f"{path}: unknown keys {sorted(unknown)}; allowed: {DETECTOR_KEYS}")
+    return raw
+
+
+def load_settings(env: Mapping[str, str] = os.environ, detector_path: Path = DETECTOR_CONFIG_PATH) -> Settings:
+    """Defaults, then config/detector.json, then env vars (named as in _PARSERS), later ones winning."""
+    kwargs = dict(load_detector_config(detector_path))
+    kwargs.update({attr: parse(env[name]) for name, (attr, parse) in _PARSERS.items() if env.get(name)})
     return Settings(**kwargs)
 
 

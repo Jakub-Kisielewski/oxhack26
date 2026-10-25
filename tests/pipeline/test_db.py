@@ -173,6 +173,30 @@ def test_two_processes_never_double_claim(con, db_url):
     assert all(results)
 
 
+def test_concurrent_enqueues_from_several_threads(con, db_url):
+    """Each thread has its own connection (as each poller tier loop does); nothing is lost or duplicated."""
+    errors = []
+
+    def enqueue_many(thread_no):
+        c = db.connect(db_url)
+        try:
+            for i in range(60):
+                db.enqueue_clip(c, f"cam{thread_no}", T0 + timedelta(seconds=i), b"x" * 100)
+                db.enqueue_clip(c, f"cam{thread_no}", T0 + timedelta(seconds=i), b"x" * 100)  # duplicate
+        except Exception as e:  # pragma: no cover - reported below
+            errors.append(e)
+        finally:
+            c.close()
+
+    threads = [threading.Thread(target=enqueue_many, args=(n,)) for n in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    assert tuple(con.execute("SELECT COUNT(*), COUNT(DISTINCT id), SUM(size_bytes) FROM clips").fetchone()) == (300, 300, 30000)
+
+
 def test_requeue_expired_returns_stale_claims_to_pending(con):
     clip_id = db.enqueue_clip(con, "A", T0, b"x")
     db.claim_next(con, now=T0)

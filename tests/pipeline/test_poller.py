@@ -102,10 +102,11 @@ def test_stale_upload_is_skipped_without_download(poller, tfl, con):
     assert _clips(con) == []
 
 
-def test_uploads_older_than_lag_are_not_downloaded(poller, tfl, con, caplog):
-    tfl.publish("https://tfl/A.mp4", '"e1"', NOW - timedelta(seconds=61))   # clip LAG 60
+def test_uploads_older_than_lag_minus_margin_are_not_downloaded(poller, tfl, con, caplog):
+    tfl.publish("https://tfl/A.mp4", '"e1"', NOW - timedelta(seconds=55))   # clip LAG 60 - 10 s margin = 50
     tfl.publish("https://tfl/B.mp4", '"e1"', NOW - timedelta(seconds=20))
-    tfl.publish("https://tfl/C.jpg", '"s1"', NOW - timedelta(seconds=100))  # still LAG 120: fresh enough
+    tfl.publish("https://tfl/C.jpg", '"s1"', NOW - timedelta(seconds=100))  # still: 120 - 10 = 110, fresh enough
+    tfl.publish("https://tfl/D.jpg", '"s1"', NOW - timedelta(seconds=115))  # still: too old
     with caplog.at_level(logging.INFO):
         stats = poller.poll_round(con, [_cam("A"), _cam("B")], T2, now=NOW)
     assert (stats.too_old, stats.enqueued, tfl.gets) == (1, 1, 1)
@@ -113,7 +114,28 @@ def test_uploads_older_than_lag_are_not_downloaded(poller, tfl, con, caplog):
     assert db.poll_rounds_since(con, NOW - timedelta(minutes=1))[0]["too_old"] == 1
     # remembered: the old upload is not re-checked for download next round
     assert poller.poll_round(con, [_cam("A")], T2, now=NOW + timedelta(seconds=15)).unchanged == 1
-    assert poller.poll_round(con, [_cam("C", tier=0)], TierLoop(0, "still", 60), now=NOW).enqueued == 1
+    still = poller.poll_round(con, [_cam("C", tier=0), _cam("D", tier=0)], TierLoop(0, "still", 60), now=NOW)
+    assert (still.enqueued, still.too_old) == (1, 1)
+
+
+def test_each_upload_is_enqueued_when_its_download_finishes(poller, tfl, con, monkeypatch):
+    class OneSlow(FakeTfL):
+        def head(self, url, timeout=None):
+            if "SLOW" in url:
+                time.sleep(1.0)
+            return super().head(url, timeout)
+    slow_tfl = OneSlow()
+    poller.session = slow_tfl
+    for cid in ("FAST", "SLOW"):
+        slow_tfl.publish(f"https://tfl/{cid}.mp4", '"e"', NOW - timedelta(seconds=5))
+    enqueued_at = {}
+    real_enqueue = db.enqueue_clip
+    monkeypatch.setattr(db, "enqueue_clip", lambda con_, cid, *a, **k: (enqueued_at.setdefault(cid, time.monotonic()),
+                                                                         real_enqueue(con_, cid, *a, **k))[1])
+    t0 = time.monotonic()
+    stats = poller.poll_round(con, [_cam("SLOW"), _cam("FAST")], T2, now=NOW)
+    assert stats.enqueued == 2
+    assert enqueued_at["FAST"] - t0 < 0.5 and enqueued_at["SLOW"] - t0 >= 1.0  # FAST did not wait for SLOW
 
 
 def test_errors_are_counted_and_do_not_stop_the_round(poller, tfl, con):

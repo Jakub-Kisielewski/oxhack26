@@ -16,8 +16,9 @@
   Each tier has its own polling loop and interval; all share one `requests.Session` and a bounded pool of
   `HEAD_THREADS` (16), of which `TIER2_RESERVED_THREADS` (4) serve tier 2 only and the rest run any tier in priority
   order, so tier 2 never waits behind other tiers. A loop never overlaps itself: an overrun skips the missed ticks
-  and logs `tier N overran`. Uploads already older than their kind's LAG are not downloaded (`skipped N too-old
-  uploads`). Bandwidth valve: `VALVE_SLOW_ROUNDS` (2) tier-2 rounds in a row slower than `POLL_SECONDS` pause tier 0
+  and logs `tier N overran`. Uploads older than their kind's LAG minus `TOO_OLD_MARGIN_S` (10) are not downloaded (`skipped N
+  too-old uploads`), and each upload is enqueued as soon as its download finishes, on the tier's own thread and
+  SQLite connection. Bandwidth valve: `VALVE_SLOW_ROUNDS` (2) tier-2 rounds in a row slower than `POLL_SECONDS` pause tier 0
   for `VALVE_PAUSE_SECONDS` (300); logged, stored in `poller_events`, shown in the sidebar. Rounds are recorded in
   `poll_rounds` (duration, bytes, too-old, overrun). Tier assignment is configurable via overrides.
 - **LAG:** `LAG_SECONDS=60` for clips, `STILL_LAG_SECONDS=120` for stills (Step 5: frame → observation is bounded by
@@ -159,7 +160,8 @@ Package layout: `pipeline/` (layer 1), `twin/` (layer 2), `ui/` (helpers used by
 - **Done when:** with the pipeline running, the map shows coloured cameras that update. Clicking one shows its
   live image, its clip and a count chart. The page refreshes without losing the selection.
 
-**Layer 1 checkpoint:** stop. Layer 1 must work end to end before Layer 2.
+**Layer 1 checkpoint:** stop. Layer 1 must work end to end before Layer 2. **Done 2026-10-25** (see
+docs/STEP5_MEASUREMENTS.md, run 4).
 
 ---
 

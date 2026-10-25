@@ -105,3 +105,22 @@ Steady-state network: ~58 KB/s of media (all tiers), on a connection that manage
 - **Remaining lateness is a poller flaw:** a round enqueues its downloads only after the whole round finishes
   (587 tier-0 stills share 5 enqueue timestamps). A still downloaded early in an 86 s round waits ~80 s to be
   enqueued, and uploads just under the LAG at HEAD time are certain to be late after that wait.
+
+## Run 4: enqueue on download, too-old margin 10 s (00:46–00:56 UTC, 25 Oct). Layer 1 complete
+
+| | Tier 2 clips | Tier 1 clips | Tier 0 stills |
+|---|---|---|---|
+| **Whole run**: rounds, median / max | 41, 0.6 / 5.6 s | 40, 1.8 / 17.0 s | 11, 5.7 / 39.6 s |
+| overruns | 0 | 1 | 0 |
+| media download | 2.9 KB/s | 36.1 KB/s | 20.0 KB/s |
+| too-old uploads skipped | 4 | 56 | 28 |
+| late (LAG 60 / 60 / 120 s) | **0/16** | **0/221** | **0/755** |
+| frame → observation median / max | 9 / 23 s | 11 / 52 s | 34 / 101 s |
+| **After 4 min**: round max | 2.0 s | 4.4 s | 9.2 s |
+| frame → observation max | 15 s | 17 s | 62 s |
+
+992 observations, 0 failed; clip processing median 105 ms, still 5 ms; enqueue → observation max 3 s; ~54 KB/s of
+media in total. Each upload is now enqueued as soon as its download finishes (the 755 tier-0 stills have 49
+distinct enqueue times, vs 5 in run 3). The valve did not trigger.
+
+**Layer 1 is complete.** No further poller tuning unless something fails.

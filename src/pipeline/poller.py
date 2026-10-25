@@ -8,11 +8,11 @@ import logging
 import signal
 import threading
 import time
-from concurrent.futures import Future
+from concurrent.futures import Future, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Mapping
 
 import requests
 
@@ -77,10 +77,6 @@ class PriorityPool:
             heapq.heappush(self._heap, (priority, next(self._seq), future, fn, args))
             self._cv.notify_all()
         return future
-
-    def map(self, priority: float, fn: Callable[[Any], Any], items: Iterable[Any]) -> list[Any]:
-        futures = [self.submit(priority, fn, item) for item in items]
-        return [f.result() for f in futures]
 
     def _next(self, reserved: bool):
         with self._cv:
@@ -211,17 +207,20 @@ class Poller:
         self.stop_event = threading.Event()
 
     def poll_round(self, con, cams: list[Mapping[str, Any]], loop: TierLoop, now: datetime | None = None) -> RoundStats:
-        """Check every camera through the pool, enqueue new media, record the round. Never waits on processing."""
+        """Check every camera through the pool and enqueue each upload as soon as its download finishes.
+
+        DB writes happen here, on the calling (tier) thread with its own connection, never on pool threads.
+        """
         now = now or db.utc_now()
         stats = RoundStats(loop.tier, loop.kind, checked=len(cams))
+        max_age_s = self.settings.lag_for(loop.kind) - self.settings.too_old_margin_s
         t0 = time.perf_counter()
-        checks = self.pool.map(
-            loop.priority,
-            lambda c: check_camera(self.session, c["camera_id"], c[URL_KEY[loop.kind]],
-                                   self.etags.get((c["camera_id"], loop.kind)), self.settings.stale_after_s, now,
-                                   self.settings.lag_for(loop.kind)),
-            cams)
-        for chk in checks:
+        futures = [self.pool.submit(loop.priority, check_camera, self.session, c["camera_id"], c[URL_KEY[loop.kind]],
+                                    self.etags.get((c["camera_id"], loop.kind)), self.settings.stale_after_s, now,
+                                    max_age_s)
+                   for c in cams]
+        for future in as_completed(futures):
+            chk = future.result()
             if chk.status == "error":
                 stats.errors += 1
                 if len(stats.error_samples) < 3:
@@ -247,8 +246,8 @@ class Poller:
         db.record_poll_round(con, {**vars(stats), "started_at": now})
         log.info(stats.line())
         if stats.too_old:
-            log.info("tier %d: skipped %d too-old uploads (older than LAG %d s)", loop.tier, stats.too_old,
-                     self.settings.lag_for(loop.kind))
+            log.info("tier %d: skipped %d too-old uploads (older than LAG - margin = %d s)", loop.tier,
+                     stats.too_old, max_age_s)
         if stats.error_samples:
             log.warning("tier %d errors: %s", loop.tier, "; ".join(stats.error_samples))
         return stats
