@@ -115,7 +115,11 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Literal, Optional, Union
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"
+# 1.1.0 (additive): Effect + MarchConditions. RoutePrediction and OverspillPrediction gain
+# `conditions: Optional[MarchConditions] = None`: the weather, media attention, calendar and
+# turnout base the model assumed, plus one Effect per factor saying what it changed
+# (target turnout/route/rowdiness/duration; basis learned/assumed/data). Mock leaves it None.
 
 LonLat = tuple[float, float]
 Path = list[LonLat]

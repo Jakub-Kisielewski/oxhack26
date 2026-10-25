@@ -8,7 +8,9 @@ from src.models.graph import GRAPH_PATH,load_graph
 from src.models.route_model import ChoiceModel
 from src.models.labels import read_events,history_counts
 from src.models.destinations import candidates
-from src.models.turnout import estimate
+from src.models.turnout import estimate,base as turnout_base
+from src.models import conditions
+from src.models.overspill import volatility,volatility_parts
 from src.models.inference import infer
 from src.models.overspill import predict as predict_spill
 from src.models.decisions import point_risk,shop_advice,allocate_police
@@ -39,25 +41,41 @@ class RealPredictor:
         if not route:raise PredictionError('Cannot connect these points on the walk network.')
         return route
 
+    def _conditions(self,ctx):
+        """Weather, media attention and calendar for this march, the turnout they imply, and every effect."""
+        c=conditions.estimate(ctx)
+        base,source=turnout_base(ctx,self.events)
+        t_effects=[] if ctx.turnout is not None else conditions.turnout_effects(c,ctx)
+        turnout=estimate(ctx,self.events,conditions.apply_turnout(base,t_effects))
+        effects=(t_effects+conditions.route_effects(c,turnout.expected,self.model)+conditions.duration_effects(c)
+                 +conditions.rowdiness_effects(volatility_parts(ctx,c)))
+        if ctx.turnout is not None:
+            base,source=int(ctx.turnout),'set by the user'
+        return c,turnout,conditions.build(c,base,source,volatility(ctx,c),effects)
+
     def predict_route(self,req:RouteRequest):
         if not mapdata.in_boundary(req.start):
             raise PredictionError('Start is outside the London model boundary. Choose a point in central London.')
-        turnout=estimate(req.context,self.events)
+        c,turnout,march_conditions=self._conditions(req.context)
         ends=candidates(req.context.cause,self.events,req.end)
         if not ends:
             raise PredictionError('No candidate destinations. Provide a destination or train with historical events.')
-        context={'turnout':turnout.expected,'cause':req.context.cause,'precip_mm_4h':0}
+        context={'turnout':turnout.expected,'cause':req.context.cause,'precip_mm_4h':c['precip_mm_4h']}
         segs,cells,routes,drivers,warnings=infer(self.graph,self.model,req.start,ends,context,
             self.history,mapdata.cause_targets,req.exclusion_zones,max(1,min(int(req.n_routes),10)))
         if not routes:warnings.append('No connected route found; check start, end and exclusion areas.')
-        duration=routes[0].duration_min+60 if routes else 60.0
+        rally=60.0*(1+sum(e.size for e in march_conditions.effects if e.target=='duration'))
+        duration=(routes[0].duration_min if routes else 0.0)+rally
         warnings.insert(0,'Routes are based on announced itineraries and shortest-path interpolations, not GPS traces.')
         return RoutePrediction(req,turnout,segs,cells,routes,ends,duration,drivers,
-                               self.version,warnings)
+                               self.version,warnings,march_conditions)
 
     def predict_overspill(self,req:OverspillRequest):
-        turnout=estimate(req.context,self.events)
-        return predict_spill(self.graph,req,turnout,self.version,mapdata.cause_targets(req.context.cause))
+        c,turnout,march_conditions=self._conditions(req.context)
+        prediction=predict_spill(self.graph,req,turnout,self.version,mapdata.cause_targets(req.context.cause),
+                                 context_features=c)
+        prediction.conditions=march_conditions
+        return prediction
 
     def point_risk(self,prediction,point):
         return point_risk(self.graph,prediction,point)

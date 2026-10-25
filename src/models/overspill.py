@@ -28,13 +28,23 @@ def level_of_service(d):
     return 'A' if d<.83 else 'B' if d<1.08 else 'C' if d<1.54 else 'D' if d<3.3 else 'E' if d<5 else 'F'
 
 
-def volatility(context:MarchContext,context_features:dict|None=None):
+def volatility_parts(context:MarchContext,context_features:dict|None=None):
+    """(name, value shown, change, why) for each part of the volatility score."""
     context_features=context_features or {}
-    v=CAUSE_VOLATILITY.get(context.cause,VOLATILITY_DEFAULT)
-    if 'counter-protest' in (context.organiser or '').lower():v+=.25
-    if context.start_time>='17:00':v+=.15
-    if float(context_features.get('salience_spike_ratio') or 0)>2:v+=.15
-    return min(1,max(0,v))
+    parts=[('Base for this cause',context.cause or 'unknown cause',CAUSE_VOLATILITY.get(context.cause,VOLATILITY_DEFAULT),
+            'Starting level by cause (hand-set).')]
+    if 'counter-protest' in (context.organiser or '').lower():
+        parts.append(('Counter-protest','organiser mentions counter-protest',.25,'Opposing groups nearby raise the risk of clashes.'))
+    if context.start_time>='17:00':
+        parts.append(('Evening start',context.start_time,.15,'Evening marches see more breakaways.'))
+    spike=float(context_features.get('salience_spike_ratio') or 0)
+    if spike>2:
+        parts.append(('Media spike',f'x{spike:.1f} usual attention',.15,'A sudden surge in attention signals a charged mood.'))
+    return parts
+
+
+def volatility(context:MarchContext,context_features:dict|None=None):
+    return min(1,max(0,sum(d for _,_,d,_ in volatility_parts(context,context_features))))
 
 
 def predict(g:MarchGraph,req:OverspillRequest,turnout:TurnoutEstimate,version:str,

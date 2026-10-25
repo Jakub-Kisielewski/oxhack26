@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Literal, Optional, Union
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"
 
 LonLat = tuple[float, float]
 Path = list[LonLat]
@@ -110,6 +110,43 @@ class Destination(_Serialisable):
     probability: float
 
 
+# ---------- conditions the model assumed, and what they changed (contract 1.1) ----------
+
+@dataclass
+class Effect(_Serialisable):
+    """One factor's effect on one output, for the UI's 'conditions & effects' panel."""
+    target: Literal["turnout", "route", "rowdiness", "duration"]
+    factor: str                # e.g. "Rain", "Media attention"
+    value: str                 # the input as shown to users, e.g. "2.4 mm in 4 h", "x1.8 usual views"
+    effect: str                # human-readable change, e.g. "x0.90 turnout", "+0.15 rowdiness"
+    size: float                # signed size for charts: relative change for turnout/duration, absolute otherwise
+    basis: Literal["learned", "assumed", "data"]   # fitted from past marches, hand-set assumption, or measured
+    description: str
+
+
+@dataclass
+class MarchConditions(_Serialisable):
+    weather_source: str                        # e.g. "Open-Meteo forecast", "Historical average for March", "unavailable"
+    temperature_c: Optional[float]
+    apparent_temperature_c: Optional[float]
+    precipitation_mm: Optional[float]          # over the first 4 hours of the march
+    wind_gust_kmh: Optional[float]
+    salience_spike: Optional[float]            # last 7 days' daily views / 90-day daily average (1 = usual)
+    salience_views_7d: Optional[int]
+    salience_as_of: Optional[str]              # date of the latest pageview data used
+    salience_articles: list[str]
+    weekday: str
+    is_weekend: bool
+    is_bank_holiday: Optional[bool]
+    is_ramadan: bool
+    sunset: str                                # "HH:MM"
+    daylight_after_start_h: float
+    turnout_base: int                          # before the adjustments in `effects`
+    turnout_base_source: str
+    rowdiness: float                           # 0-1 volatility used for breakaway risk
+    effects: list[Effect] = field(default_factory=list)
+
+
 # ---------- route mode ----------
 
 @dataclass
@@ -124,6 +161,7 @@ class RoutePrediction(_Serialisable):
     drivers: list[Driver]
     model_version: str
     warnings: list[str] = field(default_factory=list)
+    conditions: Optional[MarchConditions] = None   # contract 1.1; None if the predictor doesn't report it
 
 
 # ---------- overspill mode ----------
@@ -170,6 +208,7 @@ class OverspillPrediction(_Serialisable):
     drivers: list[Driver]
     model_version: str
     warnings: list[str] = field(default_factory=list)
+    conditions: Optional[MarchConditions] = None   # contract 1.1
 
 
 Prediction = Union[RoutePrediction, OverspillPrediction]

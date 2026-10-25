@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from src.contract.types import OverspillRequest, RouteRequest
-from src.ui import charts, common, layers
+from src.ui import charts, common, conditions_panel, layers
 from src.ui.context_form import context_form
 from src.ui.pick_map import pick_map
 
@@ -157,7 +157,8 @@ with st.expander("Check a location", expanded=bool(pin), icon=":material/locatio
             st.markdown(f"**{common.pct(risk.p_visit)}** chance the march passes within 50 m. {risk.explanation}")
 
 # ---------- details ----------
-tab_routes, tab_dest, tab_why, tab_notes = st.tabs(["Top routes", "Destinations", "Why", "Notes"])
+tab_routes, tab_dest, tab_cond, tab_why, tab_notes = st.tabs(["Top routes", "Destinations", "Conditions & effects",
+                                                             "Why", "Notes"])
 with tab_routes:
     st.dataframe(pd.DataFrame([{"Route": r.rank, "Chance": r.probability, "Length (km)": r.length_m / 1000,
                                 "Walking time (min)": r.duration_min, "Ends at": r.end_label or "-",
@@ -176,6 +177,8 @@ with tab_dest:
     st.dataframe(pd.DataFrame([{"End point": d.name, "Chance": d.probability} for d in prediction.destinations]),
                  hide_index=True, width="stretch",
                  column_config={"Chance": st.column_config.ProgressColumn("Chance", format="percent", min_value=0, max_value=1)})
+with tab_cond:
+    conditions_panel.show(prediction)
 with tab_why:
     charts.drivers_chart(prediction.drivers)
 with tab_notes:

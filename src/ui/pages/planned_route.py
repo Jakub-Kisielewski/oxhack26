@@ -3,7 +3,7 @@ import streamlit as st
 
 from src.contract import mapdata
 from src.contract.types import MarchContext, OverspillRequest
-from src.ui import charts, common, layers
+from src.ui import charts, common, conditions_panel, layers
 from src.ui.context_form import context_form, set_context
 from src.ui.pick_map import pick_map
 
@@ -136,7 +136,8 @@ layers.los_legend()
 layers.ramp_legend("Side-street spill risk:", ramp="orange")
 
 # ---------- details ----------
-tab_hot, tab_los, tab_why, tab_notes = st.tabs(["Hotspots", "Crowd levels", "Why", "Notes"])
+tab_hot, tab_los, tab_cond, tab_why, tab_notes = st.tabs(["Hotspots", "Crowd levels", "Conditions & effects",
+                                                          "Why", "Notes"])
 with tab_hot:
     if prediction.hotspots:
         st.dataframe(pd.DataFrame([{"#": i, "Where": h.label, "Risk": h.risk, "Level": h.level.title(),
@@ -153,6 +154,8 @@ with tab_los:
     charts.los_chart(tl, lengths)
     st.caption("Crowd levels follow Fruin's queuing levels of service (people per m²): "
                "A < 0.83, B < 1.08, C < 1.54, D < 3.3, E < 5, F ≥ 5.")
+with tab_cond:
+    conditions_panel.show(prediction)
 with tab_why:
     charts.drivers_chart(prediction.drivers)
 with tab_notes:
