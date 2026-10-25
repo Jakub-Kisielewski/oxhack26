@@ -96,14 +96,14 @@ m3.metric("Likeliest end", common.pct(top_dest.probability) if top_dest else "-"
 m4.metric("Route 1", common.km(top_route.length_m) if top_route else "-",
           f"{common.pct(top_route.probability)} of predicted routes" if top_route else None, delta_color="off", delta_arrow="off")
 
-shown = st.pills("Layers", ["3D heatmap", "Street probabilities", "Top routes", "Destinations", "Legal zones",
-                            "Cause targets"], selection_mode="multi", key="route_layers",
-                 default=["3D heatmap", "Top routes", "Destinations"])
+shown = st.pills("Layers", ["Heatmap", "Street probabilities", "Top routes", "Destinations", "Legal zones",
+                            "Cause targets"], selection_mode="multi", key="route_layers_2d",
+                 default=["Heatmap", "Top routes", "Destinations"])
 deck_layers = [layers.boundary_layer()]
 if "Legal zones" in shown:
     deck_layers.append(layers.legal_zones_layer())
-if "3D heatmap" in shown:
-    deck_layers.append(layers.cell_layer(prediction.cells, extruded=True))
+if "Heatmap" in shown:
+    deck_layers.append(layers.cell_layer(prediction.cells, extruded=False))
 if "Street probabilities" in shown:
     names = common.street_names(tuple(s.segment_id for s in prediction.segments[:1500]))
     deck_layers.append(layers.segment_prob_layer(prediction.segments, names))
@@ -121,15 +121,15 @@ if pin:
     deck_layers.append(layers.point_layer("pin", [(pin, "Checked location")], color=layers.rgba(layers.magenta_css())))
 
 view_points = [p for r in prediction.routes for p in r.path] + [req.start] + [d.lonlat for d in prediction.destinations]
-# Constant tilt: changing the camera between reruns blanks the deck, so toggles never move it.
-event = layers.show(layers.deck(deck_layers, layers.view_for(view_points, pitch=40)), key="route_deck", selectable=True)
+# Flat, top-down view (constant: changing the camera between reruns can blank the deck).
+event = layers.show(layers.deck(deck_layers, layers.view_for(view_points, pitch=0)), key="route_deck", selectable=True)
 legend = [("Route (1 = likeliest)", layers.ink_css("primary"), "line"), ("Start", layers.ink_css("primary"), "dot")]
 if "Destinations" in shown:
     legend.append(("Likely end point (size = chance)", layers.ink_css("surface"), "dot"))
 if "Cause targets" in shown:
     legend.append(("Cause target", layers.magenta_css(), "dot"))
 layers.legend(legend)
-if "3D heatmap" in shown or "Street probabilities" in shown:
+if "Heatmap" in shown or "Street probabilities" in shown:
     layers.ramp_legend("Chance the march passes:")
 if "Legal zones" in shown:
     layers.legal_legend()

@@ -37,7 +37,7 @@ INK = {"light": {"primary": "#0b0b0b", "secondary": "#52514e", "surface": "#fcfc
 # pydeck turns plain strings into data accessors ("@@=pixels"), which deck.gl silently
 # rejects for non-accessor props such as units; literal strings need pdk.types.String.
 PIXELS = pdk.types.String("pixels")
-# Overlays (routes, labels, markers) ignore depth so 3D hexagon columns never hide them.
+# Overlays (routes, labels, markers) ignore depth so they always draw above the heatmap.
 ON_TOP = {"depthCompare": "always", "depthTest": False}
 LOS_ORDER = ["A", "B", "C", "D", "E", "F"]
 LOS_LABEL = {"A": "A: free", "B": "B: comfortable", "C": "C: crowded", "D": "D: very crowded",
