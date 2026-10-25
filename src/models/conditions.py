@@ -23,6 +23,7 @@ import requests
 
 from src.contract import mapdata
 from src.contract.types import Effect, MarchConditions, MarchContext
+from src.models.features import dark_fraction
 
 LONDON = (51.5074, -0.1278)
 TZ = ZoneInfo("Europe/London")
@@ -198,6 +199,22 @@ def route_effects(c: dict, turnout: int, model) -> list[Effect]:
         else:
             out.append(Effect("route", "Rain", f"{rain:.1f} mm", "not applied", 0.0, "learned",
                               "Little or no rain expected, so the learned rain effect doesn't change the route."))
+    if "dark_x_main" in names:
+        w, varied = weight("dark_x_main")
+        dark = c.get("dark_fraction") or 0.0
+        value = f"{dark:.0%} after sunset ({c['sunset']})"
+        basis = "learned" if varied and "dark_x_main" not in model.stats.get("prior_only", []) else "assumed"
+        source = ("In past marches that ran after dark," if basis == "learned"
+                  else "Too few past marches ran after dark to learn this, so a hand-set prior is used:")
+        if dark <= 0:
+            out.append(Effect("route", "Darkness", value, "not applied", 0.0, basis,
+                              f"The march should finish before sunset, so darkness doesn't change the route. "
+                              f"{source} routes lean {'towards' if w > 0 else 'away from'} main roads after dark."))
+        else:
+            lean = "towards" if w > 0 else "away from"
+            out.append(Effect("route", "Darkness", value, f"leans {lean} main roads", w * dark, basis,
+                              f"{source} routes lean {lean} main, better-lit roads (weight {w:+.2f} at full "
+                              f"darkness, scaled by the {dark:.0%} of the march after sunset)."))
     if "turnout_x_width" in names:
         w, _ = weight("turnout_x_width")
         lean = "wider" if w > 0 else "narrower"
@@ -213,9 +230,6 @@ def duration_effects(c: dict) -> list[Effect]:
     if rain is not None and rain >= RAIN_HEAVY_MM:
         return [Effect("duration", "Rain", f"{rain:.1f} mm in {MARCH_HOURS} h", f"x{RAIN_RALLY_X:.2f} rally length",
                        RAIN_RALLY_X - 1, "assumed", "Heavy rain shortens the rally at the end.")]
-    if c["daylight_after_start_h"] < 2:
-        return [Effect("duration", "Darkness", f"sunset {c['sunset']}", "no change", 0.0, "assumed",
-                       "Less than 2 hours of daylight after the start; the model doesn't adjust for darkness yet.")]
     return []
 
 
@@ -229,6 +243,7 @@ def estimate(ctx: MarchContext) -> dict:
     c = {**weather(ctx), **salience(ctx.cause, dt.date.fromisoformat(ctx.date)), **calendar(ctx)}
     c["salience_spike_ratio"] = c.get("salience_spike")
     c["precip_mm_4h"] = c.get("precipitation_mm") or 0.0
+    c["dark_fraction"] = dark_fraction(c.get("daylight_after_start_h"))
     return c
 
 
