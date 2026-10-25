@@ -130,7 +130,9 @@ if "Cause targets" in shown:
     legend.append(("Cause target", layers.magenta_css(), "dot"))
 layers.legend(legend)
 if "Heatmap" in shown or "Street probabilities" in shown:
-    layers.ramp_legend("Chance the march passes:")
+    shown_values = ([c.value for c in prediction.cells] if "Heatmap" in shown else []) + \
+        ([x.p_visit for x in prediction.segments] if "Street probabilities" in shown else [])
+    layers.ramp_legend("Chance the march passes:", high=common.pct(layers.heat_max(shown_values)))
 if "Legal zones" in shown:
     layers.legal_legend()
 

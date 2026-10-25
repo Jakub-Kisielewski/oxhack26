@@ -24,8 +24,14 @@ from src.ui import common
 
 # ---------- palette (light / dark steps of the same ramps) ----------
 
-BLUE = {"light": ["#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"],
-        "dark": ["#184f95", "#1c5cab", "#256abf", "#2a78d6", "#3987e5", "#5598e7", "#6da7ec", "#86b6ef", "#9ec5f4", "#b7d3f6"]}
+# Continuous heat (probabilities): the full 100-700 blue ramp, so low values recede toward the map.
+BLUE = {"light": ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6", "#256abf",
+                  "#1c5cab", "#184f95", "#104281", "#0d366b"],
+        "dark": ["#104281", "#184f95", "#1c5cab", "#256abf", "#2a78d6", "#3987e5", "#5598e7", "#6da7ec", "#86b6ef",
+                 "#9ec5f4", "#b7d3f6", "#cde2fb"]}
+# Ordinal classes (crowd LOS A-F): each step must stay visible on the map, so start at step 250.
+BLUE_ORDINAL = {"light": ["#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"],
+                "dark": ["#184f95", "#1c5cab", "#256abf", "#2a78d6", "#3987e5", "#5598e7", "#6da7ec", "#86b6ef", "#9ec5f4", "#b7d3f6"]}
 ORANGE = {"light": ["#f6c0a6", "#f3a07c", "#ef8456", "#eb6834", "#d4582a", "#b84a21", "#9a3d1a", "#7d3014"],
           "dark": ["#7d3014", "#9a3d1a", "#b84a21", "#d95926", "#ea7445", "#f08f68", "#f4ab8d", "#f8c7b2"]}
 AQUA = {"light": "#1baf7a", "dark": "#199e70"}
@@ -71,12 +77,18 @@ def blue(value: float, alpha: Optional[int] = None) -> list[int]:
     return ramp_color(value, BLUE[mode()], alpha)
 
 
+def heat(value: float, vmax: float) -> float:
+    """Position on the colour ramp: relative to the largest value shown, square-root stretched so the many
+    small probabilities don't all share one pale shade."""
+    return math.sqrt(max(0.0, value) / vmax) if vmax > 0 else 0.0
+
+
 def orange(value: float, alpha: Optional[int] = None) -> list[int]:
     return ramp_color(value, ORANGE[mode()], alpha)
 
 
 def los_color(level: str) -> list[int]:
-    ramp = BLUE[mode()]
+    ramp = BLUE_ORDINAL[mode()]
     idx = LOS_ORDER.index(level) if level in LOS_ORDER else 0
     return rgba(ramp[round(idx * (len(ramp) - 1) / 5)], 235)
 
@@ -135,7 +147,8 @@ def _labels(layer_id: str, items: list[dict], size: int = 14) -> pdk.Layer:
 
 def segment_prob_layer(segments: list[SegmentProb], names: Optional[dict[str, str]] = None) -> pdk.Layer:
     names = names or {}
-    data = [{"path": [list(p) for p in s.path], "color": blue(s.p_visit), "width": 1.5 + 5 * s.p_visit,
+    vmax = max((s.p_visit for s in segments), default=1.0)
+    data = [{"path": [list(p) for p in s.path], "color": blue(heat(s.p_visit, vmax)), "width": 1.5 + 5 * s.p_visit,
              "tooltip": tip(names.get(s.segment_id) or "Street", f"March passes here: {common.pct(s.p_visit)}"),
              **_ll(_mid(s.path))} for s in reversed(segments)]   # most likely drawn last, on top
     return _path_layer("segments", data)
@@ -143,11 +156,12 @@ def segment_prob_layer(segments: list[SegmentProb], names: Optional[dict[str, st
 
 def cell_layer(cells: list[CellValue], extruded: bool = True, label: str = "Chance the march passes") -> pdk.Layer:
     polys = common.cell_polygons()
+    vmax = max((c.value for c in cells), default=1.0)
     data = []
     for c in cells:
         poly = polys.get(c.cell_id)
         if poly:
-            data.append({"polygon": [list(p) for p in poly["polygon"]], "color": blue(c.value, 170),
+            data.append({"polygon": [list(p) for p in poly["polygon"]], "color": blue(heat(c.value, vmax), round(120 + 110 * heat(c.value, vmax))),
                          "elevation": c.value * 350, "tooltip": tip(f"Area #{c.cell_id}", f"{label}: {common.pct(c.value)}"),
                          **_ll(poly["lonlat"])})
     return pdk.Layer("PolygonLayer", data=data, id="cells", get_polygon="polygon", get_fill_color="color",
@@ -365,6 +379,10 @@ def legend(items: list[tuple[str, str, str]]) -> None:
     parts = [f'<span style="margin-right:16px;white-space:nowrap">{_swatch(c, s)}{html.escape(label)}</span>'
              for label, c, s in items]
     st.markdown(f'<div style="font-size:0.85rem;line-height:1.9">{"".join(parts)}</div>', unsafe_allow_html=True)
+
+
+def heat_max(values) -> float:
+    return max(values, default=0.0)
 
 
 def ramp_legend(title: str, ramp: str = "blue", low: str = "0%", high: str = "100%") -> None:

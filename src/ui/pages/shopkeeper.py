@@ -82,10 +82,10 @@ deck_layers = [layers.boundary_layer()]
 if isinstance(prediction, OverspillPrediction):
     deck_layers += [layers.route_outline_layer([s.path for s in prediction.timeline]),
                     layers.spill_layer(prediction.spill, ctx)]
-    ramp_note = ("Side-street spill risk:", "orange")
+    ramp_note = ("Side-street spill risk:", "orange", "100%")
 else:
     deck_layers.append(layers.segment_prob_layer(prediction.segments))
-    ramp_note = ("Chance the march passes:", "blue")
+    ramp_note = ("Chance the march passes:", "blue", common.pct(layers.heat_max(x.p_visit for x in prediction.segments)))
 deck_layers += layers.warehouse_layers(tuple(shop), advice.warehouses)
 deck_layers.append(layers.point_layer("shop", [(tuple(shop), shop_name or "Your shop")], color=layers.rgba(layers.magenta_css())))
 layers.show(layers.deck(deck_layers, layers.view_for([tuple(shop)] + [w.lonlat for w in advice.warehouses], zoom_cap=16)),
@@ -93,7 +93,7 @@ layers.show(layers.deck(deck_layers, layers.view_for([tuple(shop)] + [w.lonlat f
 layers.legend([("Your shop", layers.magenta_css(), "dot"), ("Storage option (numbered)", layers.aqua_css(), "dot"),
                ("Way to the storage", layers.aqua_css(), "line")]
               + ([("March route", layers.ink_css("muted"), "line")] if isinstance(prediction, OverspillPrediction) else []))
-layers.ramp_legend(ramp_note[0], ramp=ramp_note[1])
+layers.ramp_legend(ramp_note[0], ramp=ramp_note[1], high=ramp_note[2])
 
 st.subheader("Where to move stock")
 if advice.warehouses:
