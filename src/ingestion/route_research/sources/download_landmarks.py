@@ -12,19 +12,27 @@ Layers (each written as raw/landmarks/<layer>.geoparquet + <layer>.csv):
                OSM embassies within 100 m get a `mission_country` from this
 
 Requires raw/boundary/zones_1_2.geojson (download_boundary.py).
-Overpass and Wikidata are public services: run sparingly.
+Overpass and Wikidata are public services: run sparingly. Busy Overpass servers
+(HTTP 429/502/504) are retried with backoff across OVERPASS_URLS. Layers that
+already exist are kept unless --refresh; a failed layer doesn't stop the others.
 """
 import argparse
 import re
+import sys
+import time
 from pathlib import Path
 
 import geopandas as gpd
 import osmnx as ox
 import pandas as pd
 import requests
+from osmnx._errors import InsufficientResponseError
 
 USER_AGENT = 'OxfordHack2026-protest-predictor/0.1 (https://github.com/Jakub-Kisielewski/oxhack26)'
 METRIC_CRS = 'EPSG:27700'
+OVERPASS_URLS = ['https://overpass-api.de/api', 'https://overpass.private.coffee/api',
+                 'https://overpass.kumi.systems/api']
+BACKOFF_S = [0, 30, 60, 120]  # wait before each round over all servers
 
 LAYERS = {
     'targets': {'amenity': ['embassy', 'townhall', 'courthouse'],
@@ -122,6 +130,39 @@ def attach_country(targets, missions, max_m=100):
     return targets.merge(joined[['osm_id', 'mission_country']], on='osm_id', how='left')
 
 
+def fetch_features(boundary, tags):
+    """features_from_polygon, retrying busy servers; an empty result is not an error."""
+    last = None
+    for wait in BACKOFF_S:
+        if wait:
+            print(f'  all Overpass servers failed; waiting {wait}s before retrying')
+            time.sleep(wait)
+        for url in OVERPASS_URLS:
+            ox.settings.overpass_url = url
+            try:
+                return ox.features_from_polygon(boundary, tags=tags)
+            except InsufficientResponseError:
+                return None
+            except Exception as exc:  # 429/502/504 and timeouts all surface as different osmnx/requests errors
+                last = exc
+                print(f'  {url}: {exc.__class__.__name__}: {str(exc).splitlines()[0][:120]}')
+    raise RuntimeError(f'Overpass unavailable after {len(BACKOFF_S)} rounds') from last
+
+
+def load_missions(out, boundary, user_agent, refresh):
+    path = out / 'missions_wikidata.geoparquet'
+    if path.exists() and not refresh:
+        return gpd.read_parquet(path)
+    try:
+        missions = fetch_missions(user_agent)
+    except (requests.RequestException, KeyError, ValueError) as exc:
+        print(f'WARNING: Wikidata query failed ({exc.__class__.__name__}); embassies get no mission_country')
+        return None
+    missions = missions[missions.intersects(boundary)]
+    save(missions, out, 'missions_wikidata')
+    return missions
+
+
 def save(gdf, out, layer):
     gdf.to_parquet(out / f'{layer}.geoparquet', index=False)
     gdf.drop(columns='geometry').to_csv(out / f'{layer}.csv', index=False)
@@ -135,6 +176,7 @@ def main():
     p.add_argument('--layers', nargs='+', choices=list(LAYERS), default=list(LAYERS))
     p.add_argument('--skip-wikidata', action='store_true')
     p.add_argument('--user-agent', default=USER_AGENT)
+    p.add_argument('--refresh', action='store_true', help='Re-download layers that already exist')
     a = p.parse_args()
     if not Path(a.boundary).exists():
         raise SystemExit(f'{a.boundary} missing: run the `boundary` step first')
@@ -143,15 +185,24 @@ def main():
     ox.settings.use_cache = True
     ox.settings.log_console = True
 
-    missions = None
-    if not a.skip_wikidata:
-        missions = fetch_missions(a.user_agent)
-        missions = missions[missions.intersects(boundary)]
-        save(missions, out, 'missions_wikidata')
+    missions = None if a.skip_wikidata else load_missions(out, boundary, a.user_agent, a.refresh)
 
+    failed = []
     for layer in a.layers:
+        if (out / f'{layer}.geoparquet').exists() and not a.refresh:
+            print(f'{layer}: already downloaded (use --refresh to redo)')
+            continue
         print(f'Fetching {layer} from Overpass...')
-        gdf = prepare(ox.features_from_polygon(boundary, tags=LAYERS[layer]), boundary)
+        try:
+            raw = fetch_features(boundary, LAYERS[layer])
+        except RuntimeError as exc:
+            print(f'ERROR: {layer}: {exc}', file=sys.stderr)
+            failed.append(layer)
+            continue
+        if raw is None:
+            print(f'{layer}: no features found')
+            continue
+        gdf = prepare(raw, boundary)
         if layer == 'targets':
             gdf = gdf[~col(gdf, 'memorial').isin(MINOR_MEMORIALS)]
             gdf['category'] = gdf.apply(target_category, axis=1)
@@ -164,6 +215,8 @@ def main():
         elif layer == 'warehouses':
             gdf['footprint_m2'] = gdf['area_m2'].where(gdf['area_m2'] > 0)
         save(gdf, out, layer)
+    if failed:
+        raise SystemExit(f'Failed layers: {", ".join(failed)}; re-run to fetch just those')
 
 
 if __name__ == '__main__':

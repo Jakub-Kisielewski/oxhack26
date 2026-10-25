@@ -94,9 +94,12 @@ python ingest.py --skip crawl acled           # leave these out
 python ingest.py --refresh                    # re-download cached data (boundary, osm, landmarks, police)
 python ingest.py --refresh osm                # re-download just one of them
 python ingest.py --acled-file path/to/export.csv
+python ingest.py --since 2024-01-01           # more police/crawler history (default: 1 January this year)
 ```
 
-- The first run is slow: the OSM network and landmarks for zones 1-2 take several minutes each, and the crawler visits about 15 sites. Later runs skip downloads whose files already exist.
+- The first run is slow: the OSM network and landmarks for zones 1-2 take several minutes each. The crawler runs in the background alongside the other steps (log in `data/runs/ingest_crawl.log`). Later runs skip downloads whose files already exist.
+- `--since` only limits the police months and the crawler's organiser-event window. All 65 seed routes are always used for training.
+- Landmarks retry busy Overpass servers with backoff across three mirrors. If a layer still fails, re-run `python ingest.py --only landmarks` and only the missing layers are fetched.
 - If a step fails, the steps that depend on it are skipped, the rest still run, and a summary is printed at the end. Re-run a failed step with `--only <step>`.
 - Every step can also be run on its own, see `src/ingestion/route_research/README.md`.
 

@@ -9,6 +9,9 @@ data/route_research/, crawler runs under data/runs/.
 If a step fails, the steps that depend on it are skipped and the rest still
 run; a summary is printed at the end. Slow downloads (boundary, osm, landmarks,
 police) are skipped when their outputs already exist; use --refresh to redo them.
+The crawler runs in the background alongside the other steps (log in
+data/runs/ingest_crawl.log). --since (default: 1 January this year) limits the
+police months and the organiser-event window; the seed routes are always all used.
 
 Examples:
     python ingest.py                      # everything
@@ -16,6 +19,7 @@ Examples:
     python ingest.py --only weather event-context
     python ingest.py --skip crawl acled
     python ingest.py --refresh osm        # re-download only the street network
+    python ingest.py --since 2024-01-01   # more police/crawler history (slower)
 """
 from __future__ import annotations
 
@@ -35,7 +39,9 @@ from src.ingestion.route_research import pipeline as route_pipeline
 ROOT = Path(__file__).resolve().parent
 WORKDIR = route_pipeline.DEFAULT_WORKSPACE
 EVENTS = route_pipeline.HERE / 'seed' / 'events.csv'
+CRAWL_LOG = ROOT / 'data' / 'runs' / 'ingest_crawl.log'
 POLICE_LAG_MONTHS = 2  # data.police.uk publishes about two months behind
+ORGANIZER_DAYS_AHEAD = 120  # keep upcoming organiser events
 
 
 @dataclass
@@ -47,13 +53,14 @@ class Step:
     skip_reason: Callable[[argparse.Namespace], Optional[str]] = lambda a: None
     args: Callable[[argparse.Namespace], list[str]] = lambda a: []
     kind: str = 'route'  # route | crawl | database
+    background: bool = False  # start first, run alongside the other steps
 
 
-def police_months(_args) -> list[str]:
-    """Event months the police API can serve (it keeps about three years)."""
+def police_months(args) -> list[str]:
+    """Event months since --since that the police API can serve (it keeps about three years)."""
     today = dt.date.today()
     latest = (today.replace(day=1) - dt.timedelta(days=31 * POLICE_LAG_MONTHS)).strftime('%Y-%m')
-    earliest = f'{today.year - 3}-{today.month:02d}'
+    earliest = max(f'{today.year - 3}-{today.month:02d}', args.since.strftime('%Y-%m'))
     with EVENTS.open(encoding='utf-8-sig') as f:
         months = {r['event_date'][:7] for r in csv.DictReader(f) if r.get('event_date')}
     return sorted(m for m in months if earliest <= m <= latest)
@@ -72,9 +79,10 @@ STEPS = [
          outputs=['raw/osm/london_walk.graphml', 'raw/osm/london_main.graphml']),
     Step('landmarks', 'Targets, open spaces, shops, warehouses, diplomatic missions', needs=['boundary'],
          outputs=['raw/landmarks/targets.geoparquet', 'raw/landmarks/open_spaces.geoparquet',
-                  'raw/landmarks/shops.geoparquet', 'raw/landmarks/warehouses.geoparquet']),
+                  'raw/landmarks/shops.geoparquet', 'raw/landmarks/warehouses.geoparquet'],
+         args=lambda a: ['--refresh'] if 'landmarks' in a.refresh_steps else []),
     Step('police', 'Public-order crimes for event months', outputs=['raw/police/police_public_order_context.csv'],
-         skip_reason=lambda a: None if police_months(a) else 'no event months inside the police API window',
+         skip_reason=lambda a: None if police_months(a) else 'no event months since --since inside the police API window',
          args=lambda a: ['--months', *police_months(a)]),
     Step('tfl', 'Snapshot of current TfL road disruptions and tube status'),
     Step('acled', 'ACLED protest events for London', skip_reason=acled_skip,
@@ -85,7 +93,9 @@ STEPS = [
     Step('weather', 'Hourly Open-Meteo weather around each event date'),
     Step('pageviews', 'Daily Wikipedia views per cause'),
     Step('event-context', 'Per-event calendar, daylight, weather and salience features'),
-    Step('crawl', 'Tier 1 crawlers: Met Police, OSAC, TfL, Marble Arch, organiser sites', kind='crawl'),
+    Step('crawl', 'Tier 1 crawlers: Met Police, OSAC, TfL, Marble Arch, organiser sites', kind='crawl',
+         background=True, args=lambda a: ['--organizer-event-days-back', str((dt.date.today() - a.since).days),
+                                          '--organizer-event-days-ahead', str(ORGANIZER_DAYS_AHEAD)]),
     Step('database', 'Create the DuckDB schema in data/protest.duckdb', kind='database'),
 ]
 BY_NAME = {s.name: s for s in STEPS}
@@ -95,7 +105,7 @@ def run_step(step: Step, args) -> int:
     if step.kind == 'route':
         return route_pipeline.main(['--workdir', str(args.workdir), step.name, *step.args(args)])
     if step.kind == 'crawl':
-        return subprocess.run([sys.executable, '-m', 'src.ingestion'], cwd=ROOT, check=False).returncode
+        return subprocess.run(crawl_command(step, args), cwd=ROOT, check=False).returncode
     from src.database.db import get_connection, init_schema
     con = get_connection()
     try:
@@ -104,6 +114,17 @@ def run_step(step: Step, args) -> int:
     finally:
         con.close()
     return 0
+
+
+def crawl_command(step: Step, args) -> list[str]:
+    return [sys.executable, '-m', 'src.ingestion', *step.args(args)]
+
+
+def start_background(step: Step, args) -> subprocess.Popen:
+    CRAWL_LOG.parent.mkdir(parents=True, exist_ok=True)
+    print(f'=== {step.name}: started in the background, log: {CRAWL_LOG.relative_to(ROOT)} ===', flush=True)
+    log = CRAWL_LOG.open('w', encoding='utf-8')
+    return subprocess.Popen(crawl_command(step, args), cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
 
 
 def cached(step: Step, args) -> bool:
@@ -119,6 +140,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument('--refresh', nargs='*', choices=names, metavar='STEP',
                    help='Re-run cached downloads (all of them, or just the named steps)')
     p.add_argument('--acled-file', help='Manually downloaded ACLED CSV/XLSX instead of API credentials')
+    p.add_argument('--since', type=dt.date.fromisoformat, default=dt.date(dt.date.today().year, 1, 1),
+                   help='Earliest date for police months and organiser events (default: 1 January this year)')
     p.add_argument('--workdir', type=Path, default=WORKDIR)
     p.add_argument('--list', action='store_true', help='Show the steps and exit')
     args = p.parse_args(argv)
@@ -133,7 +156,13 @@ def main(argv: list[str] | None = None) -> int:
     selected = [s for s in STEPS if (not args.only or s.name in args.only) and s.name not in args.skip]
     status: dict[str, str] = {}
     timings: dict[str, float] = {}
+    background: dict[str, tuple[subprocess.Popen, float]] = {}
     for step in selected:
+        if step.background and not step.needs:
+            background[step.name] = (start_background(step, args), time.monotonic())
+    for step in selected:
+        if step.name in background:
+            continue
         blocked = [n for n in step.needs if status.get(n, 'ok').startswith(('FAILED', 'skipped (needs'))]
         reason = step.skip_reason(args)
         if blocked:
@@ -152,6 +181,13 @@ def main(argv: list[str] | None = None) -> int:
                 code = 1
             timings[step.name] = time.monotonic() - start
             status[step.name] = 'ok' if code == 0 else f'FAILED (exit {code})'
+
+    for name, (proc, start) in background.items():
+        if proc.poll() is None:
+            print(f'\nWaiting for background step {name} (see {CRAWL_LOG.relative_to(ROOT)})...', flush=True)
+        code = proc.wait()
+        timings[name] = time.monotonic() - start
+        status[name] = 'ok' if code == 0 else f'FAILED (exit {code}, see {CRAWL_LOG.relative_to(ROOT)})'
 
     print('\n=== Ingestion summary ===')
     for step in selected:
