@@ -88,8 +88,10 @@ def live_view() -> None:
         if not row["active"]:
             st.warning("TfL lists this camera as unavailable; its feed may be blank.")
         if pd.notna(row["people"]):
-            reading = (f"**Latest reading:** {row['people']:g} people, {row['age_txt']} "
-                       f"({row['kind']}, quality {row['quality']})")
+            uncertainty = (f" ± {row['count_sd']:.1f}" if pd.notna(row.get("count_sd")) else "")
+            raw = (f", raw detector count {row['raw_people']:g}" if pd.notna(row.get("raw_people")) else "")
+            reading = (f"**Latest reading:** {round(row['people'], 1):g}{uncertainty} people, {row['age_txt']} "
+                       f"({row['kind']}, quality {row['quality']}{raw})")
             extras = [f"density {row['density']:.2f}/m²" if pd.notna(row["density"]) else None,
                       f"speed {row['speed']:.2f} m/s" if pd.notna(row["speed"]) else None,
                       f"heading {row['heading']:.0f}°" if pd.notna(row["heading"]) else None]

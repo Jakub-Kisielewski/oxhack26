@@ -52,3 +52,9 @@ def test_twin_lag_is_the_max_over_enabled_kinds():
     assert load_settings({}).twin_lag_seconds == 120  # tier 0 stills enabled
     assert load_settings({"TIER0_ENABLED": "false"}).twin_lag_seconds == 60  # clips only
     assert load_settings({"TIER0_KIND": "clip"}).twin_lag_seconds == 60
+
+
+def test_banner_rects_env_override():
+    s = load_settings({"BANNER_RECTS_PX": "0,0,10,10; 20,20,30,30"})
+    assert s.banner_rects_px == ((0, 0, 10, 10), (20, 20, 30, 30))
+    assert len(load_settings({}).banner_rects_px) == 3

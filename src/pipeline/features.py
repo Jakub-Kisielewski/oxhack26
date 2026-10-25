@@ -11,7 +11,9 @@ from typing import Any, Mapping, Protocol
 import cv2
 import numpy as np
 
+from src.pipeline.boxes import filter_boxes
 from src.pipeline.config import REPO_ROOT, SETTINGS, Settings
+from src.pipeline.correction import Correction, correct
 
 PROC_VERSION = "features-v1"
 CALIBRATION_DIR = REPO_ROOT / "calibration"
@@ -124,22 +126,43 @@ def ground_velocity(frames: list[np.ndarray], boxes: list[np.ndarray], dt: float
     return float(math.hypot(east, north)), float(math.degrees(math.atan2(east, north)) % 360)
 
 
+def aggregate_counts(counts: list[int], how: str = "median") -> float:
+    """One count for a clip from its per-frame counts: median, or p75 (catches people hidden in some frames)."""
+    if how == "median":
+        return float(np.median(counts))
+    if how == "p75":
+        return float(np.percentile(counts, 75))
+    raise ValueError(f"count aggregation must be 'median' or 'p75', got {how!r}")
+
+
+def detect_filtered(frames: list[np.ndarray], detector: PersonDetector, roi=None,
+                    settings: Settings = SETTINGS) -> list[np.ndarray]:
+    """Per-frame person boxes after the ROI, banner and minimum-height filters."""
+    return [filter_boxes(b, f.shape, roi, settings=settings) for b, f in zip(detector.detect(frames), frames)]
+
+
 def extract_features(data: bytes, camera: Mapping[str, Any], detector: PersonDetector, kind: str = "clip",
-                     settings: Settings = SETTINGS) -> dict[str, Any]:
+                     settings: Settings = SETTINGS, rois: Mapping[str, Any] | None = None,
+                     correction: Correction | None = None) -> dict[str, Any]:
     """Observation fields for one chunk (a clip or a still). Frames exist only in memory."""
     if kind == "still":
         frames, dt = decode_still(data), 0.0
     else:
         frames, dt = sample_clip(data, settings.sample_fps)
-    out: dict[str, Any] = {"lat": camera.get("lat"), "lon": camera.get("lon"), "people": None, "density": None,
-                           "speed": None, "heading": None, "proc_version": f"{PROC_VERSION}+{detector.name}"}
+    out: dict[str, Any] = {"lat": camera.get("lat"), "lon": camera.get("lon"), "people": None, "raw_people": None,
+                           "count_sd": None, "luma": None, "density": None, "speed": None, "heading": None,
+                           "proc_version": f"{PROC_VERSION}+{detector.name}"}
     if not frames:
         return {**out, "quality": "blank"}
-    out["quality"] = frame_quality(frames[len(frames) // 2], reference_frame(camera["camera_id"]))
+    middle = frames[len(frames) // 2]
+    out["luma"] = float(cv2.cvtColor(middle, cv2.COLOR_BGR2GRAY).mean())
+    out["quality"] = frame_quality(middle, reference_frame(camera["camera_id"]))
     if out["quality"] == "blank":
         return out
-    boxes = detector.detect(frames)
-    out["people"] = float(np.median([len(b) for b in boxes]))
+    boxes = detect_filtered(frames, detector, (rois or {}).get(camera["camera_id"]), settings)
+    out["raw_people"] = aggregate_counts([len(b) for b in boxes], settings.count_agg)
+    out["people"], out["count_sd"] = correct(out["raw_people"], camera["camera_id"], out["quality"], out["luma"],
+                                             correction or Correction(), settings)
     calib = Calibration.from_json(camera["homography"]) if camera.get("homography") else None
     if calib is not None:
         if calib.area_m2:

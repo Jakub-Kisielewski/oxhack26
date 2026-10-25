@@ -14,7 +14,7 @@ class FakeDetector:
     name = "fake@0"
 
     def detect(self, frames):
-        return [np.array([[0, 0, 5, 5, 0.9], [9, 9, 20, 20, 0.8]]) for _ in frames]
+        return [np.array([[0, 100, 5, 120, 0.9], [9, 100, 20, 130, 0.8]]) for _ in frames]
 
 
 class Exploding(FakeDetector):

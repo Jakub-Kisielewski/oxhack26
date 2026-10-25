@@ -28,6 +28,7 @@ gtfs-realtime-bindings>=0.0.7
 opencv-python-headless>=4.10
 ultralytics>=8.3
 pillow>=10.0
+sahi>=0.12
 
 # --- Tests ---
 pytest>=8.0

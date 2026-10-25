@@ -43,6 +43,14 @@
   (which imports `db` → `config`) never imports poller code (JAMCAM.md invariant 4).
 - **Step 6 is split:** 6a (camera layer by tier + live viewer, page `src/ui/live_map.py`, data in
   `src/ui/live_data.py`) is built before Step 3; Step 6 adds count colouring, the history chart and sidebar stats.
+- **Detection accuracy (after Layer 1):** detections are filtered before counting: TfL overlay boxes
+  (`BANNER_RECTS_PX`: date/time, logo, camera name), optional per-camera ROI polygons (`config/camera_rois.json`,
+  committed; a box counts if its foot point is inside) and `MIN_BOX_H` (8 px). Per-frame counts are aggregated over
+  the clip (`COUNT_AGG` median | p75). `observations.raw_people` is that count; `people` is bias-corrected
+  (`a * raw + b`, `config/count_correction.json`, fitted on hand labels) and `count_sd` comes from the fit's
+  residuals, multiplied by `DARK_SD_FACTOR` when quality is `dark` or mean brightness `luma` < `LOW_LUMA`. The
+  benchmarked detector settings live in `config/detector.json` (env vars still win). Weights live in `models/`.
+  Labelling and benchmark: `docs/DETECTION_EVAL.md`.
 - **Tests:** `.gitignore` no longer ignores `tests/`, `test_*.py`, `*_test.py`.
 - **Reference poller:** `jamcam_poller.py` lives at `src/pipeline/jamcam_poller.py` (logic unchanged; CLI is
   `python -m src.pipeline.jamcam_poller --list`). Other modules import its functions from there.

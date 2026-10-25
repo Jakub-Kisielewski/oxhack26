@@ -52,7 +52,7 @@ def prepare(cams: pd.DataFrame, now: datetime) -> pd.DataFrame:
         color=[people_colour(p) if f else NO_DATA_COLOUR for p, f in zip(cams["people"], fresh)],
         radius=cams["tier"].map(TIER_RADIUS_M).fillna(18),
         status=["active" if a else "inactive" for a in cams["active"]],
-        people_txt=[f"{p:g} people" if f else "no current count" for p, f in zip(cams["people"], fresh)],
+        people_txt=[f"{round(p, 1):g} people" if f else "no current count" for p, f in zip(cams["people"], fresh)],
         age_txt=[age_text(a) for a in age_s],
     )
 

@@ -79,7 +79,7 @@ def test_uncalibrated_camera_gives_null_density_and_speed():
 def test_people_is_the_median_over_frames():
     class Varying(FakeDetector):
         def detect(self, frames):
-            box = np.array([[0, 0, 5, 5, 0.9]])
+            box = np.array([[0, 100, 5, 120, 0.9]])
             return [np.repeat(box, k, axis=0) for k in ([0, 1, 1, 9] * 10)[:len(frames)]]
     assert extract_features(make_mp4(4), CAM, Varying())["people"] == 1.0
 
@@ -97,7 +97,7 @@ def test_unreadable_clip_is_blank():
 
 
 def test_still_is_counted_from_one_frame():
-    out = extract_features(make_jpeg(), {**CAM}, FakeDetector([[1, 1, 9, 9, 0.5]]), kind="still")
+    out = extract_features(make_jpeg(), {**CAM}, FakeDetector([[100, 100, 110, 130, 0.5]]), kind="still")
     assert out["people"] == 1.0 and out["speed"] is None
 
 
@@ -165,3 +165,29 @@ def test_synthetic_clip_with_no_people_counts_zero(yolo):
     out = extract_features(make_mp4(10), CAM, yolo)
     assert out["people"] == 0.0
     assert out["density"] is None and out["speed"] is None
+
+
+def test_features_store_raw_corrected_count_sd_and_luma():
+    from src.pipeline.correction import Correction, Line
+    det = FakeDetector([[100, 100, 110, 140, 0.9], [200, 100, 212, 150, 0.9], [300, 5, 320, 30, 0.9]])  # 3rd in logo
+    corr = Correction(Line(a=2.0, b=1.0, sd=1.5, n=30))
+    bright = extract_features(make_mp4(3), CAM, det, correction=corr, settings=replace(Settings(), low_luma=50))
+    assert bright["raw_people"] == 2.0 and bright["people"] == 5.0 and bright["count_sd"] == 1.5
+    assert 60 < bright["luma"] < 180
+    night = rng_dark_clip()
+    dark = extract_features(night, CAM, det, correction=corr, settings=replace(Settings(), low_luma=50))
+    assert dark["luma"] < 50 and dark["count_sd"] == 3.0  # low light: sd doubled
+
+
+def test_p75_aggregation_setting():
+    class Varying(FakeDetector):
+        def detect(self, frames):
+            box = np.array([[100, 100, 110, 130, 0.9]])
+            return [np.repeat(box, k, axis=0) for k in ([0, 1, 2, 3] * 10)[:len(frames)]]
+    out = extract_features(make_mp4(4), CAM, Varying(), settings=replace(Settings(), count_agg="p75"))
+    assert out["raw_people"] > extract_features(make_mp4(4), CAM, Varying())["raw_people"]
+
+
+def rng_dark_clip():
+    rng = np.random.default_rng(3)
+    return _write_mp4([rng.integers(0, 70, (288, 352, 3), dtype=np.uint8) for _ in range(25)])

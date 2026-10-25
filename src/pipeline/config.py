@@ -72,9 +72,10 @@ class Settings:
     sahi_slice: int = 192            # slice size in px (352x288 frames -> 2x2 slices with overlap)
     count_agg: str = "median"        # aggregation of per-frame counts over a clip: median | p75
     min_box_h: float = 8.0           # drop person boxes shorter than this (px)
-    banner_top_px: float = 0.0       # TfL overlay strips on 352x288 frames (see docs/STEP5_MEASUREMENTS.md)
-    banner_bottom_px: float = 0.0
-    low_luma: float = 50.0           # mean grey level below this = low light: count_sd x dark_sd_factor
+    # TfL overlay boxes on 352x288 frames as (x0, y0, x1, y1): date/time, TfL logo, camera name (measured 2026-10-25)
+    banner_rects_px: tuple[tuple[float, float, float, float], ...] = (
+        (0, 0, 124, 13), (260, 0, 352, 36), (40, 273, 312, 288))
+    low_luma: float = 85.0           # mean grey below this = low light: count_sd x dark_sd_factor (night 63-134)
     dark_sd_factor: float = 2.0
     # queue
     claim_timeout_s: int = 300
@@ -149,8 +150,7 @@ _PARSERS = {
     "SAHI_SLICE": ("sahi_slice", int),
     "COUNT_AGG": ("count_agg", str),
     "MIN_BOX_H": ("min_box_h", float),
-    "BANNER_TOP_PX": ("banner_top_px", float),
-    "BANNER_BOTTOM_PX": ("banner_bottom_px", float),
+    "BANNER_RECTS_PX": ("banner_rects_px", lambda t: tuple(_floats(r) for r in t.split(";") if r.strip())),
     "LOW_LUMA": ("low_luma", float),
     "DARK_SD_FACTOR": ("dark_sd_factor", float),
     "CLAIM_TIMEOUT_S": ("claim_timeout_s", int),

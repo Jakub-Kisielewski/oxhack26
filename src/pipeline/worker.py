@@ -8,7 +8,9 @@ import threading
 import time
 
 from src.pipeline import db
+from src.pipeline.boxes import load_rois
 from src.pipeline.config import SETTINGS, Settings
+from src.pipeline.correction import load_correction
 from src.pipeline.features import PersonDetector, extract_features
 
 log = logging.getLogger(__name__)
@@ -20,6 +22,8 @@ class Worker:
         self.detector = detector
         self.settings = settings
         self.name = name
+        self.rois = load_rois()              # config/camera_rois.json, read once per worker
+        self.correction = load_correction()  # config/count_correction.json
         self.stop_event = threading.Event()
 
     def process_one(self) -> str | None:
@@ -31,7 +35,8 @@ class Worker:
         camera = db.get_camera(self.con, clip["camera_id"]) or {"camera_id": clip["camera_id"]}
         try:
             t0 = time.perf_counter()
-            feats = extract_features(clip["data"], camera, self.detector, kind=clip["kind"], settings=self.settings)
+            feats = extract_features(clip["data"], camera, self.detector, kind=clip["kind"], settings=self.settings,
+                                     rois=self.rois, correction=self.correction)
             proc_ms = round((time.perf_counter() - t0) * 1000)
             db.insert_observation(self.con, {**feats, "camera_id": clip["camera_id"], "frame_time": clip["frame_time"],
                                              "chunk_index": clip["chunk_index"], "kind": clip["kind"],
@@ -41,8 +46,8 @@ class Worker:
             log.exception("%s: chunk %s (%s) failed", self.name, clip["id"], clip["camera_id"])
             db.mark_failed(self.con, clip["id"], f"{type(e).__name__}: {e}")
             return "failed"
-        log.info("%s: %s %s people=%s quality=%s %d ms", self.name, clip["kind"], camera.get("name", clip["camera_id"]),
-                 feats["people"], feats["quality"], proc_ms)
+        log.info("%s: %s %s people=%s raw=%s quality=%s %d ms", self.name, clip["kind"],
+                 camera.get("name", clip["camera_id"]), feats["people"], feats["raw_people"], feats["quality"], proc_ms)
         return "done"
 
     def run(self, until_empty: bool = False) -> None:
