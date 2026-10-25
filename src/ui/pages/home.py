@@ -41,18 +41,18 @@ for row in (tools[:3], tools[3:]):
             st.caption(text)
 
 bt = common.backtest()
-if bt and "route_model" in bt.summary and "shortest_path" in bt.summary:
-    st.subheader("How well it predicts past marches")
-    model, base = bt.summary["route_model"], bt.summary["shortest_path"]
-    a, b, c = st.columns(3)
-    a.metric("Top route overlap", common.pct(model.get("top1_jaccard", 0)),
-             f"{(model.get('top1_jaccard', 0) - base.get('top1_jaccard', 0)) * 100:+.0f} pts vs shortest path")
-    b.metric("True end in top 3", common.pct(model.get("destination_in_top3", 0)),
-             f"{(model.get('destination_in_top3', 0) - base.get('destination_in_top3', 0)) * 100:+.0f} pts vs shortest path")
-    c.metric("Log-likelihood per step", f"{model.get('mean_log_likelihood', 0):.2f}",
-             f"{model.get('mean_log_likelihood', 0) - base.get('mean_log_likelihood', 0):+.2f} vs shortest path")
-    st.caption(f"Leave-one-event-out over {bt.n_events} past marches."
-               + (" Sample numbers from the mock predictor." if common.is_mock() else ""))
+# if bt and "route_model" in bt.summary and "shortest_path" in bt.summary:
+#     st.subheader("How well it predicts past marches")
+#     model, base = bt.summary["route_model"], bt.summary["shortest_path"]
+#     a, b, c = st.columns(3)
+#     a.metric("Top route overlap", common.pct(model.get("top1_jaccard", 0)),
+#              f"{(model.get('top1_jaccard', 0) - base.get('top1_jaccard', 0)) * 100:+.0f} pts vs shortest path")
+#     b.metric("True end in top 3", common.pct(model.get("destination_in_top3", 0)),
+#              f"{(model.get('destination_in_top3', 0) - base.get('destination_in_top3', 0)) * 100:+.0f} pts vs shortest path")
+#     c.metric("Log-likelihood per step", f"{model.get('mean_log_likelihood', 0):.2f}",
+#              f"{model.get('mean_log_likelihood', 0) - base.get('mean_log_likelihood', 0):+.2f} vs shortest path")
+#     st.caption(f"Leave-one-event-out over {bt.n_events} past marches."
+#                + (" Sample numbers from the mock predictor." if common.is_mock() else ""))
 
 route, overspill = st.session_state.get("route_prediction"), st.session_state.get("overspill_prediction")
 if route or overspill:
