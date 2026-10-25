@@ -17,6 +17,7 @@ class TrainingEvent:
     destination:tuple[float,float]
     route:list[str]
     weight:list[float]
+    destination_name:str=''
 
 
 def read_events(g:MarchGraph, interpolated_weight:float=INTERPOLATED_WEIGHT)->list[TrainingEvent]:
@@ -37,7 +38,7 @@ def read_events(g:MarchGraph, interpolated_weight:float=INTERPOLATED_WEIGHT)->li
         output.append(TrainingEvent(e.event_id,e.date,e.cause,
                       {'turnout': e.turnout or 10000,'precip_mm_4h':rains.get(e.event_id,0),
                        'dark_fraction':darks.get(e.event_id,0)},
-                      pts[-1],route,weights))
+                      pts[-1],route,weights,str(e.waypoints[-1][0] or '').strip()))
     return output
 
 

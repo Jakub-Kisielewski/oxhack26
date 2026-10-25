@@ -16,7 +16,8 @@ def candidates(cause:str|None,events:list[TrainingEvent],end=None,max_n:int=5)->
     for e in events:
         if cause and e.cause!=cause:continue
         if not any(mapdata.distance_m(e.destination,p)<150 for _,p,_ in raw):
-            raw.append(('Historical endpoint',e.destination,1.0))
+            name=getattr(e,'destination_name','')
+            raw.append((f'{name[:1].upper()}{name[1:]} (past end point)' if name else 'Past end point',e.destination,1.0))
     scores=[]
     for name,pt,w in raw:
         n=sum(1 for e in events if (not cause or e.cause==cause) and
