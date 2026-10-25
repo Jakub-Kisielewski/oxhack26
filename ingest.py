@@ -8,8 +8,8 @@ Route data is written under data/route_research/, crawler runs under data/runs/.
 
 If a step fails, the steps that depend on it are skipped and the rest still
 run; a summary is printed at the end. Slow steps (boundary, osm, landmarks,
-missions, police, edge-features, grid) are skipped when their outputs already
-exist; use --refresh to redo them.
+police, edge-features, grid) are skipped when their outputs already exist; use
+--refresh to redo them.
 The crawler runs in the background alongside the other steps (log in
 data/runs/ingest_crawl.log). --since (default: 1 January this year) limits the
 police months and the organiser-event window; the seed routes are always all used.
@@ -82,8 +82,6 @@ STEPS = [
          outputs=['raw/landmarks/targets.geoparquet', 'raw/landmarks/open_spaces.geoparquet',
                   'raw/landmarks/shops.geoparquet', 'raw/landmarks/warehouses.geoparquet'],
          args=lambda a: ['--refresh'] if 'landmarks' in a.refresh_steps else []),
-    Step('missions', 'Embassies/high commissions and their countries from Wikidata', needs=['boundary'],
-         outputs=['raw/landmarks/missions.geoparquet']),
     Step('police', 'Public-order crimes for event months', outputs=['raw/police/police_public_order_context.csv'],
          skip_reason=lambda a: None if police_months(a) else 'no event months since --since inside the police API window',
          args=lambda a: ['--months', *police_months(a)]),

@@ -32,7 +32,6 @@ TABLES = {
     "open_spaces":     ("raw/landmarks/open_spaces.geoparquet", "parquet", None),
     "shops":           ("raw/landmarks/shops.geoparquet", "parquet", None),
     "warehouses":      ("raw/landmarks/warehouses.geoparquet", "parquet", None),
-    "missions":        ("raw/landmarks/missions.geoparquet", "parquet", None),
     "grid_cells":      ("normalised/grid_cells.geoparquet", "parquet", None),
     "grid_adjacency":  ("normalised/grid_adjacency.csv", "csv", None),
     "segment_cells":   ("normalised/segment_cells.csv", "csv", None),
@@ -133,18 +132,13 @@ def column_exists(con, table: str, column: str) -> bool:
 def derive(con) -> dict[str, str]:
     """Columns and rows that combine several loaded tables."""
     status = {}
-    if table_exists(con, "targets") and table_exists(con, "missions"):
-        # OSM embassies get the country of the nearest Wikidata mission within 100 m,
-        # else OSM's own ISO country code (`country` tag).
-        con.execute("ALTER TABLE targets ADD COLUMN IF NOT EXISTS mission_country VARCHAR")
-        osm_code = "t.country" if column_exists(con, "targets", "country") else "NULL"
-        con.execute(f"""
-            UPDATE targets t SET mission_country = COALESCE((
-                SELECT arg_min(m.mission_country, meters(m.geometry, t.geometry)) FROM missions m
-                WHERE m.mission_country IS NOT NULL AND meters(m.geometry, t.geometry) < 100), {osm_code})
-            WHERE t.category = 'diplomatic'""")
-        n, total = con.execute("SELECT COUNT(mission_country), COUNT(*) FROM targets WHERE category = 'diplomatic'").fetchone()
-        status["targets.mission_country"] = f"{n:,} of {total:,} embassies have a country"
+    if table_exists(con, "targets"):
+        # Embassy countries are OSM's ISO `country` tag; drop the column older landmark runs added.
+        con.execute("ALTER TABLE targets DROP COLUMN IF EXISTS mission_country")
+        con.execute("DROP TABLE IF EXISTS missions")
+        if column_exists(con, "targets", "country"):
+            n, total = con.execute("SELECT COUNT(country), COUNT(*) FROM targets WHERE category = 'diplomatic'").fetchone()
+            status["targets.country"] = f"{n:,} of {total:,} embassies have a country code"
     if table_exists(con, "legal_zones") and table_exists(con, "open_spaces"):
         con.execute("""
             INSERT INTO legal_zones

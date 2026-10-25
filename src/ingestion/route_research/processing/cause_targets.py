@@ -3,15 +3,15 @@
 
 seed/cause_targets.csv lists, per cause, the places marches head for with a prior
 weight (cause `any` applies to every cause). Each target is located from, in order:
-the reviewed seed geocode named in `waypoint_name`; for embassies, the Wikidata
-mission or OSM diplomatic target of that country within MAX_MATCH_M of the seed
+the reviewed seed geocode named in `waypoint_name`; for embassies, the OSM
+diplomatic target with that ISO country code within MAX_MATCH_M of the seed
 coordinates (so a consulate elsewhere isn't picked); else the seed coordinates.
 
 For each target, seed_route_hit_rate is the share of that cause's seed events with
 an approved waypoint within --hit-radius-m, a sanity check of the prior weights.
 
 Input: seed/cause_targets.csv (package seed folder), normalised/event_context.csv (cause per event),
-       normalised/waypoints_approved.csv, raw/landmarks/{missions,targets}.geoparquet
+       normalised/waypoints_approved.csv, raw/landmarks/targets.geoparquet
 OUT:   normalised/cause_targets.csv
 """
 import argparse
@@ -53,22 +53,19 @@ def reviewed_geocodes(cache_path, overrides_path):
     return coords
 
 
-def locate(row, geocodes, missions, osm_targets):
+def locate(row, geocodes, osm_targets):
     """(lat, lon, source) for a target row."""
     if row.waypoint_name and row.waypoint_name in geocodes:
         return (*geocodes[row.waypoint_name], 'reviewed_geocode')
     if row.kind == 'embassy':
-        return locate_embassy(row, missions, osm_targets)
+        return locate_embassy(row, osm_targets)
     return row.lat, row.lon, 'seed_approx'
 
 
-def locate_embassy(row, missions, osm_targets):
+def locate_embassy(row, osm_targets):
     """(lat, lon, source) for an embassy row, nearest to the seed coordinates when several match."""
     candidates = []
-    if row.country:
-        m = missions[missions.mission_country.fillna('').str.lower() == row.country.lower()]
-        candidates += [(r.lat, r.lon, 'wikidata_mission') for r in m.itertuples()]
-    if not candidates and row.iso2:
+    if row.iso2:
         o = osm_targets[(osm_targets.category == 'diplomatic') & (osm_targets.country.fillna('').str.upper() == row.iso2.upper())]
         candidates += [(r.lat, r.lon, 'osm_country_tag') for r in o.itertuples()]
     candidates = [c for c in candidates if haversine_m(row.lat, row.lon, c[0], c[1]) <= MAX_MATCH_M]
@@ -94,7 +91,6 @@ def main():
     p.add_argument('--targets', default=str(PACKAGE_SEED / 'cause_targets.csv'))
     p.add_argument('--event-context', default='normalised/event_context.csv')
     p.add_argument('--waypoints', default='normalised/waypoints_approved.csv')
-    p.add_argument('--missions', default='raw/landmarks/missions.geoparquet')
     p.add_argument('--osm-targets', default='raw/landmarks/targets.geoparquet')
     p.add_argument('--geocode-cache', default=str(PACKAGE_SEED / 'geocode_cache.json'))
     p.add_argument('--geocode-overrides', default=str(PACKAGE_SEED / 'waypoint_geocode_overrides.json'))
@@ -103,10 +99,9 @@ def main():
     a = p.parse_args()
     targets = pd.read_csv(a.targets, keep_default_na=False).replace('', None)
     targets[['lat', 'lon', 'weight']] = targets[['lat', 'lon', 'weight']].astype(float)
-    missions = read_layer(a.missions, ['mission_country', 'lat', 'lon'])
     osm = read_layer(a.osm_targets, ['category', 'country', 'lat', 'lon'])
     geocodes = reviewed_geocodes(a.geocode_cache, a.geocode_overrides)
-    located = [locate(r, geocodes, missions, osm) for r in targets.itertuples()]
+    located = [locate(r, geocodes, osm) for r in targets.itertuples()]
     targets['lat'], targets['lon'], targets['location_source'] = zip(*located)
 
     if Path(a.event_context).exists() and Path(a.waypoints).exists():

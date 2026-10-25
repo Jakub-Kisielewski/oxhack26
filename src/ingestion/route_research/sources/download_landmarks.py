@@ -8,8 +8,7 @@ Layers (each written as raw/landmarks/<layer>.geoparquet + <layer>.csv):
   shops        every shop=* (shopkeeper warnings)
   warehouses   warehouses, self-storage, industrial land with footprint_m2 as a
                capacity proxy (stock evacuation)
-Embassy countries come from download_missions.py (Wikidata), joined in the
-database load.
+Embassies carry OSM's ISO 3166-1 alpha-2 `country` tag (e.g. IL, US).
 
 Requires raw/boundary/zones_1_2.geojson (download_boundary.py).
 Overpass is a public service: run sparingly. Busy Overpass servers

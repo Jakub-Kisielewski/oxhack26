@@ -131,11 +131,10 @@ python -m src.ingestion.route_research.pipeline next-street --lat 51.508 --lon -
 |---|---|---|---|
 | `boundary` | `sources/download_boundary.py` | `raw/boundary/zones_1_2.geojson`, `raw/boundary/zone_stations.csv` | One polygon: concave hull of TfL zone 1-2 stations, buffered 300 m |
 | `osm` | `sources/download_osm.py` | `raw/osm/london_walk.graphml`, `raw/osm/london_edges.geojson`, `raw/osm/london_main.graphml`, `raw/osm/london_main_edges.geojson` | Directed walk graph clipped to the boundary (with lanes/width/bridge tags), plus a main-roads-only graph |
-| `landmarks` | `sources/download_landmarks.py` | `raw/landmarks/{targets,open_spaces,shops,warehouses,missions_wikidata}.{geoparquet,csv}` | One OSM feature per row with category, area_m2, centroid lat/lon; embassies carry `mission_country` |
-| `missions` | `sources/download_missions.py` | `raw/landmarks/missions.{geoparquet,csv}` | One Wikidata diplomatic mission per row with `mission_country` (operator, else parsed from the label) |
+| `landmarks` | `sources/download_landmarks.py` | `raw/landmarks/{targets,open_spaces,shops,warehouses}.{geoparquet,csv}` | One OSM feature per row with category, area_m2, centroid lat/lon; embassies carry the ISO `country` code |
 | `edge-features` | `processing/edge_features.py` | `normalised/edge_features.csv` | One row per `segment_id`: width/capacity, betweenness, junction degree, bridge/tunnel, legal-zone and Royal Park flags |
 | `grid` | `processing/build_grid.py` | `normalised/grid_cells.geoparquet`, `grid_adjacency.csv`, `segment_cells.csv` | Flat-top hexagons (100 m radius) in EPSG:27700, neighbour pairs, segment-to-cell lookup |
-| `cause-targets` | `processing/cause_targets.py` | `normalised/cause_targets.csv` | `seed/cause_targets.csv` with embassies located from missions/OSM and `seed_route_hit_rate` per target |
+| `cause-targets` | `processing/cause_targets.py` | `normalised/cause_targets.csv` | `seed/cause_targets.csv` with targets located from reviewed geocodes or OSM embassies and `seed_route_hit_rate` per target |
 | `weather` | `sources/download_weather.py` | `raw/weather/hourly.csv` | Hourly Open-Meteo values around each event date; `source` = archive or forecast |
 | `pageviews` | `sources/download_pageviews.py` | `raw/pageviews/daily.csv` | Daily Wikipedia views per cause article |
 | `event-context` | `processing/event_context.py` | `normalised/event_context.csv`, `raw/calendar/bank_holidays.json` | One row per event: calendar, Ramadan, daylight, 4 h weather window, pre-event salience |

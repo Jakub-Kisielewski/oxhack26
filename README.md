@@ -41,7 +41,6 @@ This runs every step in dependency order:
 | `boundary` | Zones 1-2 polygon from TfL station zones | `data/route_research/raw/boundary/` |
 | `osm` | OSM walk network + main-road network inside the boundary | `data/route_research/raw/osm/` |
 | `landmarks` | Protest targets, squares/parks (capacity), shops, warehouses | `data/route_research/raw/landmarks/` |
-| `missions` | Embassies/high commissions and the country running each (Wikidata) | `data/route_research/raw/landmarks/missions.*` |
 | `police` | Public-order crimes for the months of the seed events | `data/route_research/raw/police/` |
 | `tfl` | Snapshot of current TfL road disruptions and tube status | `data/route_research/raw/tfl/` |
 | `acled` | ACLED London protest events (only with credentials) | `data/route_research/raw/acled/` |
@@ -63,7 +62,7 @@ Useful options:
 python ingest.py --list                       # steps and their dependencies
 python ingest.py --only weather event-context # run just these
 python ingest.py --skip crawl acled           # leave these out
-python ingest.py --refresh                    # redo cached steps (boundary, osm, landmarks, missions, police, edge-features, grid)
+python ingest.py --refresh                    # redo cached steps (boundary, osm, landmarks, police, edge-features, grid)
 python ingest.py --refresh osm                # re-download just one of them
 python ingest.py --acled-file path/to/export.csv
 python ingest.py --since 2024-01-01           # more police/crawler history (default: 1 January this year)
@@ -87,7 +86,7 @@ The dashboard's **Data status** table shows what was loaded and when.
 
 | Group | Tables |
 |---|---|
-| Map | `boundary`, `segments` (walk network with `n_published_route_examples` and all `edge_features` columns: `width_m`, `capacity_people`, `betweenness_*`, `*_degree`, `in_*_zone`), `main_edges`, `targets` (embassies have `mission_country`), `open_spaces` (`area_m2` = rally capacity), `shops`, `warehouses`, `missions`, `legal_zones` (no-entry sites, Parliament Square controlled area, Royal Parks) |
+| Map | `boundary`, `segments` (walk network with `n_published_route_examples` and all `edge_features` columns: `width_m`, `capacity_people`, `betweenness_*`, `*_degree`, `in_*_zone`), `main_edges`, `targets` (embassies have an ISO `country` code), `open_spaces` (`area_m2` = rally capacity), `shops`, `warehouses`, `legal_zones` (no-entry sites, Parliament Square controlled area, Royal Parks) |
 | Grid | `grid_cells` (~200 m hexagons), `grid_adjacency` (neighbouring cells), `segment_cells` (which cells each street crosses) |
 | Events and routes | `events`, `waypoints`, `route_segments` (ordered `segment_id`s per `event_id`), `event_context`, `cause_targets` |
 | Context | `crimes`, `tfl_disruptions`, `acled_events`, `weather_hourly`, `pageviews_daily`, `protest_signals` (latest crawler run) |
@@ -171,8 +170,6 @@ The `src/ingestion/route_research/` pipeline downloads additional geographic, hi
 - **TfL Unified API — Station fare zones (for the Zones 1-2 boundary):** https://api.tfl.gov.uk/StopPoint/Mode/tube,dlr,overground,elizabeth-line
 
 - **OpenStreetMap Overpass (via OSMnx) — Embassies, government buildings, landmarks, squares, parks, shops, warehouses:** https://overpass-api.de/
-
-- **Wikidata SPARQL — Diplomatic missions in London and the country that runs them:** https://query.wikidata.org/
 
 - **Open-Meteo — Historical and forecast hourly weather (no key):** https://open-meteo.com/en/docs/historical-weather-api
 

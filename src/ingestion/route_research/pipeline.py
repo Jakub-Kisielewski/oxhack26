@@ -25,7 +25,6 @@ STEPS: dict[str, tuple[str, list[str]]] = {
     'boundary': ('sources/download_boundary.py', []),
     'osm': ('sources/download_osm.py', []),
     'landmarks': ('sources/download_landmarks.py', []),
-    'missions': ('sources/download_missions.py', []),
     'weather': ('sources/download_weather.py', []),
     'pageviews': ('sources/download_pageviews.py', []),
     'police': ('sources/download_police.py', []),
