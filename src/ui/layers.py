@@ -86,8 +86,8 @@ def ink(role: str = "primary", alpha: int = 255) -> list[int]:
 
 
 def tip(title: str, *lines: str) -> str:
-    body = "".join(f"<div>{html.escape(line)}</div>" for line in lines if line)
-    return f"<b>{html.escape(title)}</b>{body}"
+    """Plain-text tooltip, one fact per line. The deck tooltip escapes field values, so no HTML here."""
+    return "\n".join([str(title), *(str(line) for line in lines if line)])
 
 
 def _mid(path: Path) -> LonLat:
@@ -326,7 +326,7 @@ def deck(layers: list[pdk.Layer], view: pdk.ViewState) -> pdk.Deck:
     style = {"backgroundColor": INK[m]["surface"], "color": INK[m]["primary"], "fontSize": "13px",
              "border": f"1px solid {INK[m]['muted']}", "borderRadius": "6px", "padding": "6px 8px"}
     return pdk.Deck(layers=layers, initial_view_state=view, map_provider="carto", map_style=m,
-                    tooltip={"html": "{tooltip}", "style": style})
+                    tooltip={"html": '<div style="white-space:pre-line">{tooltip}</div>', "style": style})
 
 
 def show(deck_obj: pdk.Deck, key: str, height: int = 560, selectable: bool = False):
