@@ -675,13 +675,14 @@ Goal: a polished Streamlit app that works fully on the mock first, then switches
 **B2. Map layers** (`layers.py`), all pydeck, `(lon, lat)` order:
 - `segment_prob_layer(segments)`: `PathLayer`, width by probability, sequential colour scale.
 - `cell_layer(cells, extruded=True)`: `PolygonLayer` from `mapdata.cells`, with height and colour by value. This is the plan's 3D heatmap.
-- `routes_layer(routes)`: one `PathLayer` per route, in distinct colours by rank.
-- `spill_layer(spill)`: `PathLayer` coloured by `kind` with opacity by `p_spill`.
-- `hotspot_layer(hotspots)`: `ScatterplotLayer`.
+- `routes_layers(routes)`: one `PathLayer` per route in neutral ink (route 1 widest) with number labels, drawn on top of the heatmap. *(Built this way instead of colour-by-rank so routes never compete with the blue probability ramp.)*
+- `spill_layer(spill)`: `PathLayer` coloured by `p_spill` on an orange ramp; `kind` is shown in tooltips and the hotspot table. *(Colour by kind clashed with the crowd-density colours on the same map.)*
+- `hotspot_layers(hotspots)`: numbered neutral rings; risk level shown as an icon + label badge in the table.
 - `timeline_layer(timeline, t)`: segments occupied at minute `t` (`head ≤ t ≤ tail`), coloured by LOS.
 - Base layers: `boundary_layer`, `legal_zones_layer` (no_entry red, restricted amber, royal_park green), `targets_layer`, `shops_layer`, `warehouses_layer`.
 - Tooltips on every layer: street name if available, probability, time window, reason.
 - A shared legend component. Colour scales must be colour-blind safe and readable in light and dark themes.
+- pydeck gotcha: plain string props become data accessors (`width_units="pixels"` → `"@@=pixels"`), which deck.gl silently rejects. Use `pdk.types.String("pixels")` for literal strings.
 
 **B3. Point picking** (`pick_map.py`). A `streamlit_folium` map returning `last_clicked`, converted to `(lon, lat)`, with a mode selector (start / end / add waypoint / shop) and an "assembly point" dropdown from `mapdata.assembly_points()` as an alternative. Reject points outside `mapdata.in_boundary` with a friendly message.
 

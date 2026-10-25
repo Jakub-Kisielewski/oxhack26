@@ -1,0 +1,3 @@
+[theme]
+# Blue from the chart palette (categorical slot 1 / sequential ramp), so buttons and charts agree.
+primaryColor = "#2a78d6"

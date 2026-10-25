@@ -1,7 +1,8 @@
+import duckdb
 import streamlit as st
 from src.database.db import get_connection, init_schema
 
-st.set_page_config(page_title="London Protest Predictor", layout="wide")
+st.set_page_config(page_title="London Protest Predictor", page_icon=":material/groups:", layout="wide")
 
 
 @st.cache_resource
@@ -13,7 +14,12 @@ def bootstrap() -> bool:
     before the pages open their read-only ones, so we never hold two
     conflicting locks on the DB file.
     """
-    con = get_connection(read_only=False)
+    try:
+        con = get_connection(read_only=False)
+    except duckdb.IOException:
+        # Another process (model training, a notebook, a second app) has the file open.
+        # The loader already created the schema, so pages can still read it.
+        return False
     try:
         init_schema(con)
     finally:
@@ -23,8 +29,21 @@ def bootstrap() -> bool:
 
 bootstrap()
 
-pages = [
-    st.Page("src/ui/home.py",     title="Dashboard",       icon="📊", default=True),
-    st.Page("src/ui/map_view.py", title="Zones 1 & 2 Map", icon="🗺️"),
-]
+pages = {
+    "Overview": [
+        st.Page("src/ui/pages/home.py", title="Dashboard", icon=":material/dashboard:", default=True),
+    ],
+    "Predict": [
+        st.Page("src/ui/pages/route_predictor.py", title="Route predictor", icon=":material/explore:"),
+        st.Page("src/ui/pages/planned_route.py", title="Planned route", icon=":material/route:"),
+    ],
+    "Decide": [
+        st.Page("src/ui/pages/shopkeeper.py", title="Shopkeeper advice", icon=":material/storefront:"),
+        st.Page("src/ui/pages/police.py", title="Police allocation", icon=":material/local_police:"),
+    ],
+    "Explore": [
+        st.Page("src/ui/pages/model_insights.py", title="Model insights", icon=":material/insights:"),
+        st.Page("src/ui/pages/map_explorer.py", title="Map explorer", icon=":material/map:"),
+    ],
+}
 st.navigation(pages).run()
