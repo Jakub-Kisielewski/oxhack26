@@ -165,8 +165,18 @@ def routes_layers(routes: list[RouteOption]) -> list[pdk.Layer]:
             "width": widths.get(r.rank, 2.0),
             "tooltip": tip(f"Route {r.rank} ({common.pct(r.probability)})", f"{common.km(r.length_m)}, about {common.duration(r.duration_min)}",
                            f"Ends at {r.end_label}" if r.end_label else ""), **_ll(_mid(r.path))}], on_top=True))
-    out.append(_labels("route_labels", [{"text": str(r.rank), **_ll(_mid(r.path))} for r in routes]))
+    out.append(_labels("route_labels", [{"text": str(r.rank), **_ll(_distinct_point(r, routes))} for r in routes]))
     return out
+
+
+def _distinct_point(route: RouteOption, routes: list[RouteOption]) -> LonLat:
+    """Vertex of this route furthest from every other route, so overlapping routes get separate labels."""
+    others = [p for r in routes if r.rank != route.rank for p in r.path]
+    if not others or len(route.path) < 3:
+        return _mid(route.path)
+    k = math.cos(math.radians(route.path[0][1]))
+    gap = lambda p: min(math.hypot((p[0] - q[0]) * k, p[1] - q[1]) for q in others)
+    return max(route.path[1:-1], key=gap)
 
 
 def destinations_layers(destinations: list[Destination]) -> list[pdk.Layer]:

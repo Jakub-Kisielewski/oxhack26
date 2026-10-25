@@ -144,8 +144,18 @@ def allocate_police(prediction: OverspillPrediction, officers: int) -> Optional[
     return _guard(_allocate_police, request_key(prediction.request), _version(), int(officers))
 
 
+# The contract leaves summary metric names open; accept the model's names for the UI's keys.
+METRIC_ALIASES = {"destination_top3_rate": "destination_in_top3", "destination_in_top3_rate": "destination_in_top3"}
+
+
 def backtest() -> Optional[BacktestResult]:
-    return _guard(_backtest, _version())
+    bt = _guard(_backtest, _version())
+    if bt:
+        for metrics in bt.summary.values():
+            for alias, key in METRIC_ALIASES.items():
+                if alias in metrics and key not in metrics:
+                    metrics[key] = metrics[alias]
+    return bt
 
 
 # ---------- cached base data ----------
