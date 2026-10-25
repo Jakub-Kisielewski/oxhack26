@@ -2,9 +2,10 @@
 """Resolve the hand-made cause -> target table and check it against the seed routes.
 
 seed/cause_targets.csv lists, per cause, the places marches head for with a prior
-weight (cause `any` applies to every cause). Embassy rows are located from the data
-when possible: the Wikidata mission run by that country, else an OSM diplomatic
-target with that ISO country code, else the approximate seed coordinates.
+weight (cause `any` applies to every cause). Each target is located from, in order:
+the reviewed seed geocode named in `waypoint_name`; for embassies, the Wikidata
+mission or OSM diplomatic target of that country within MAX_MATCH_M of the seed
+coordinates (so a consulate elsewhere isn't picked); else the seed coordinates.
 
 For each target, seed_route_hit_rate is the share of that cause's seed events with
 an approved waypoint within --hit-radius-m, a sanity check of the prior weights.
@@ -17,9 +18,12 @@ import argparse
 import math
 from pathlib import Path
 
+import json
+
 import pandas as pd
 
 PACKAGE_SEED = Path(__file__).resolve().parents[1] / 'seed'
+MAX_MATCH_M = 400
 
 
 def haversine_m(lat1, lon1, lat2, lon2):
@@ -39,6 +43,25 @@ def read_layer(path, columns):
     return df[columns]
 
 
+def reviewed_geocodes(cache_path, overrides_path):
+    coords = {}
+    for path in (cache_path, overrides_path):  # overrides win
+        if Path(path).exists():
+            for name, v in json.loads(Path(path).read_text(encoding='utf-8')).items():
+                if not name.startswith('_') and v.get('latitude') is not None and v.get('ok', True):
+                    coords[name] = (float(v['latitude']), float(v['longitude']))
+    return coords
+
+
+def locate(row, geocodes, missions, osm_targets):
+    """(lat, lon, source) for a target row."""
+    if row.waypoint_name and row.waypoint_name in geocodes:
+        return (*geocodes[row.waypoint_name], 'reviewed_geocode')
+    if row.kind == 'embassy':
+        return locate_embassy(row, missions, osm_targets)
+    return row.lat, row.lon, 'seed_approx'
+
+
 def locate_embassy(row, missions, osm_targets):
     """(lat, lon, source) for an embassy row, nearest to the seed coordinates when several match."""
     candidates = []
@@ -48,6 +71,7 @@ def locate_embassy(row, missions, osm_targets):
     if not candidates and row.iso2:
         o = osm_targets[(osm_targets.category == 'diplomatic') & (osm_targets.country.fillna('').str.upper() == row.iso2.upper())]
         candidates += [(r.lat, r.lon, 'osm_country_tag') for r in o.itertuples()]
+    candidates = [c for c in candidates if haversine_m(row.lat, row.lon, c[0], c[1]) <= MAX_MATCH_M]
     if not candidates:
         return row.lat, row.lon, 'seed_approx'
     return min(candidates, key=lambda c: haversine_m(row.lat, row.lon, c[0], c[1]))
@@ -72,6 +96,8 @@ def main():
     p.add_argument('--waypoints', default='normalised/waypoints_approved.csv')
     p.add_argument('--missions', default='raw/landmarks/missions.geoparquet')
     p.add_argument('--osm-targets', default='raw/landmarks/targets.geoparquet')
+    p.add_argument('--geocode-cache', default=str(PACKAGE_SEED / 'geocode_cache.json'))
+    p.add_argument('--geocode-overrides', default=str(PACKAGE_SEED / 'waypoint_geocode_overrides.json'))
     p.add_argument('--hit-radius-m', type=float, default=250)
     p.add_argument('--output', default='normalised/cause_targets.csv')
     a = p.parse_args()
@@ -79,8 +105,8 @@ def main():
     targets[['lat', 'lon', 'weight']] = targets[['lat', 'lon', 'weight']].astype(float)
     missions = read_layer(a.missions, ['mission_country', 'lat', 'lon'])
     osm = read_layer(a.osm_targets, ['category', 'country', 'lat', 'lon'])
-    located = [locate_embassy(r, missions, osm) if r.kind == 'embassy' else (r.lat, r.lon, 'seed_approx')
-               for r in targets.itertuples()]
+    geocodes = reviewed_geocodes(a.geocode_cache, a.geocode_overrides)
+    located = [locate(r, geocodes, missions, osm) for r in targets.itertuples()]
     targets['lat'], targets['lon'], targets['location_source'] = zip(*located)
 
     if Path(a.event_context).exists() and Path(a.waypoints).exists():

@@ -125,19 +125,26 @@ def table_exists(con, table: str) -> bool:
     return bool(con.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?", [table]).fetchone()[0])
 
 
+def column_exists(con, table: str, column: str) -> bool:
+    return bool(con.execute("SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
+                            [table, column]).fetchone()[0])
+
+
 def derive(con) -> dict[str, str]:
     """Columns and rows that combine several loaded tables."""
     status = {}
     if table_exists(con, "targets") and table_exists(con, "missions"):
-        # OSM embassies get the country of the nearest Wikidata mission within 100 m.
+        # OSM embassies get the country of the nearest Wikidata mission within 100 m,
+        # else OSM's own ISO country code (`country` tag).
         con.execute("ALTER TABLE targets ADD COLUMN IF NOT EXISTS mission_country VARCHAR")
-        con.execute("""
-            UPDATE targets t SET mission_country = (
+        osm_code = "t.country" if column_exists(con, "targets", "country") else "NULL"
+        con.execute(f"""
+            UPDATE targets t SET mission_country = COALESCE((
                 SELECT arg_min(m.mission_country, meters(m.geometry, t.geometry)) FROM missions m
-                WHERE m.mission_country IS NOT NULL AND meters(m.geometry, t.geometry) < 100)
+                WHERE m.mission_country IS NOT NULL AND meters(m.geometry, t.geometry) < 100), {osm_code})
             WHERE t.category = 'diplomatic'""")
-        n = con.execute("SELECT COUNT(*) FROM targets WHERE mission_country IS NOT NULL").fetchone()[0]
-        status["targets.mission_country"] = f"{n:,} embassies matched"
+        n, total = con.execute("SELECT COUNT(mission_country), COUNT(*) FROM targets WHERE category = 'diplomatic'").fetchone()
+        status["targets.mission_country"] = f"{n:,} of {total:,} embassies have a country"
     if table_exists(con, "legal_zones") and table_exists(con, "open_spaces"):
         con.execute("""
             INSERT INTO legal_zones

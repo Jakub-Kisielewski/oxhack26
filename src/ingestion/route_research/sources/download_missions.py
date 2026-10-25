@@ -68,6 +68,7 @@ def main():
                      headers={'User-Agent': a.user_agent, 'Accept': 'application/sparql-results+json'})
     r.raise_for_status()
     df = parse_bindings(r.json()['results']['bindings'])
+    print(f'Wikidata returned {len(df)} mission rows ({df.wikidata.nunique()} unique) in the London box')
     # One row per mission, keeping the first country when several operators are listed.
     rank = df.country_source.map({'operator': 0, 'label': 1}).fillna(2)
     df = df.assign(_rank=rank).sort_values('_rank').drop_duplicates('wikidata').drop(columns='_rank')
