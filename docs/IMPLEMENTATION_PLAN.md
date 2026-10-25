@@ -482,6 +482,11 @@ Read-only access to base data for **both** tracks. Every function returns contra
 | `cells(ids: Optional[list[int]] = None) -> list[dict]` | `{cell_id, lonlat (centroid), polygon: Path}` | `grid_cells` |
 | `assembly_points() -> list[dict]` | first waypoint of each historical event, grouped by name: `{name, lonlat, n_events}` | `waypoints` |
 | `in_boundary(lonlat) -> bool` | point-in-polygon | `boundary` |
+| `cells_for_segments(ids) -> dict[str, int]` | midpoint hexagon of each segment | `segment_cells` |
+| `cell_at(lonlat) -> Optional[int]` | hexagon containing a point | `grid_cells` |
+| `distance_m(a, b) -> float` | haversine metres between two `(lon, lat)` points (no database) | |
+
+Setting the `PROTEST_DB` environment variable (read in `src/database/db.py`) points the loader, the app and `mapdata` at another database file, e.g. a test database.
 
 ### 3.7 `src/contract/mock.py` (specified)
 
@@ -492,10 +497,10 @@ Read-only access to base data for **both** tracks. Every function returns contra
 - add the warning `"Mock predictor: outputs are illustrative, not model predictions."` to every prediction.
 
 Behaviour:
-- `predict_route`: pick the end point (`req.end`, else the highest-weight `mapdata.cause_targets(cause)` target). Select `segments` whose midpoint is within 150 m of the straight line from start to end (pre-filter with a bounding box). Give each `p_visit = 0.9 · exp(−(distance from line / 60 m)²)`, keep ≥ 0.01, and order route 1 by projection along the line. Return 3 routes: route 1 from those segments, and routes 2–3 from lines bent ±300 m through a midpoint, with probabilities 0.6/0.25/0.15. Also fill `cells` (max per `segment_cells` midpoint cell), 3 `destinations` from `cause_targets`, turnout = `context.turnout` or 20,000 (`source="mock"`), duration = length / 42 m/min + 60, and 3 sample `drivers`.
+- `predict_route`: pick the end point (`req.end`, else the highest-weight `mapdata.cause_targets(cause)` target). Build 3 lines: the straight line from start to end, and two lines bent ±300 m through the midpoint. Select `segments` whose midpoint is within 150 m of any line, give each `p_visit = max over lines of w · exp(−(distance / 60 m)²)` with w = 0.9/0.5/0.3, and keep ≥ 0.01. Each route's `segment_ids` are the segments within 40 m of its line, in order along it; its `path` is the line itself. Route probabilities are 0.6/0.25/0.15. Segments inside `exclusion_zones` are dropped. Also fill `cells` (max per `segment_cells` midpoint cell), 3 `destinations` from `cause_targets`, turnout = `context.turnout` or 20,000 (`source="mock"`), duration = length / 42 m/min + 60, and 3 sample `drivers`.
 - `snap_route`: for consecutive point pairs, segments within 60 m of the connecting line, ordered along it.
-- `predict_overspill`: timeline with head = cumulative length / 42 m/min, tail = head + 45, density = `turnout / (crowd_length · width_m)` clamped to 0.5–6, and LOS from the Fruin table in section 5 (A7). Spill = segments sharing a `u`/`v` node with the route but not on it, with `p_spill` = 0.6 × (density / 6) × random(0.5–1), `kind` "pressure" (or "breakaway" if within 150 m of a `targets` row), and window = [head, tail + 30]. Top 10 as hotspots.
-- `point_risk`: nearest segment in the prediction within 50 m, otherwise zeros. `shop_advice`: `point_risk` at the shop, `act_by_min = window_start − 60`, and the 3 nearest `warehouses` with a straight-line path. `allocate_police`: distribute officers in units of 10 over the top-risk spill segments in proportion to `p_spill`, with `expected_spill_after = before · 0.7`.
+- `predict_overspill`: timeline with head = cumulative length / 42 m/min, tail = head + crowd length / 42 (crowd length = turnout / (1.5 · median width)), density = `1.5 · median_width / width_m` clamped to 0.5–6, and LOS from the Fruin table in section 5 (A7). Spill = segments sharing a `u`/`v` node with the route but not on it, with `p_spill` = 0.6 × (density / 6) × random(0.5–1), `kind` "pressure" (or "breakaway" if within 150 m of a `targets` row), and window = [head, tail + 30]. Top 10 as hotspots.
+- `point_risk`: nearest segment in the prediction within 50 m, otherwise zeros. For an overspill prediction, a point on the route itself counts as `p_spill = 1` with the head–tail window (the crowd passes directly). `shop_advice`: `point_risk` at the shop, `act_by_min = window_start − 60`, and the 3 nearest `warehouses` with a straight-line path. `allocate_police`: distribute officers in units of 10 over the top-risk spill segments in proportion to `p_spill`, with `expected_spill_after = before · 0.7`.
 - `backtest`: return a fixed sample `BacktestResult` with 3 events × 3 models.
 
 ### 3.8 `src/contract/selftest.py` (specified)
@@ -535,6 +540,8 @@ Exit code 1 on any failure.
 ---
 
 ## 4. Phase 0: shared setup (one person, about 1 hour, before splitting)
+
+> **Status: done.** The contract, mock and self-test are on `main`. The self-test passes with the mock against a database built by the real pipeline. Both tracks start from that commit.
 
 1. Create `src/contract/` with the 5 exact files (3.2–3.5) plus `mapdata.py`, `mock.py` and `selftest.py` implementing 3.6–3.8.
 2. Add `scipy>=1.11` to `requirements.txt`. It's already pulled in by scikit-learn, but list it explicitly.

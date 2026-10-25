@@ -1,7 +1,9 @@
+import os
 from pathlib import Path
 import duckdb
 
-DB_PATH = Path(__file__).resolve().parents[2] / "data" / "protest.duckdb"
+# PROTEST_DB points the whole app (loader, UI, models) at another database file.
+DB_PATH = Path(os.environ.get("PROTEST_DB", Path(__file__).resolve().parents[2] / "data" / "protest.duckdb"))
 
 
 def _install_spatial(con: duckdb.DuckDBPyConnection) -> None:
@@ -47,9 +49,9 @@ def init_schema(con: duckdb.DuckDBPyConnection) -> None:
             ST_Transform(a, 'EPSG:4326', 'EPSG:27700', always_xy := true),
             ST_Transform(b, 'EPSG:4326', 'EPSG:27700', always_xy := true));
     """)
-    # Placeholders from the original GTFS/grid plan, never populated.
+    # Placeholder from the original GTFS plan, never populated. (grid_cells is now
+    # the real hexagon grid built by the loader, so it must not be dropped here.)
     con.execute("DROP TABLE IF EXISTS transit_snapshots")
-    con.execute("DROP TABLE IF EXISTS grid_cells")
 
 
 if __name__ == "__main__":

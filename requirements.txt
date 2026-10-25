@@ -18,6 +18,7 @@ libpysal>=4.10
 esda>=2.5.1
 scikit-learn>=1.5
 numpy>=2.0
+scipy>=1.11
 pandas>=2.2.2
 
 # --- Data Ingestion & APIs ---

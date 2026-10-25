@@ -1,8 +1,8 @@
 import streamlit as st
-from src.database.db import get_connection
+from src.contract import mapdata
 
 
 @st.cache_resource
 def get_db():
-    """Shared read-only connection for all UI pages."""
-    return get_connection(read_only=True)
+    """The shared read-only connection (same one the model layer uses)."""
+    return mapdata.connection()
