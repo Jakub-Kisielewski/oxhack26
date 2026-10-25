@@ -19,6 +19,7 @@ import duckdb
 from src.database.db import DB_PATH, get_connection, init_schema
 
 ROOT = Path(__file__).resolve().parents[2]
+LEGAL_ZONES = ROOT / "src" / "ingestion" / "route_research" / "seed" / "legal_zones.geojson"
 ROUTE_DIR = ROOT / "data" / "route_research"
 RUNS_DIR = ROOT / "data" / "runs"
 
@@ -31,12 +32,16 @@ TABLES = {
     "open_spaces":     ("raw/landmarks/open_spaces.geoparquet", "parquet", None),
     "shops":           ("raw/landmarks/shops.geoparquet", "parquet", None),
     "warehouses":      ("raw/landmarks/warehouses.geoparquet", "parquet", None),
-    "missions":        ("raw/landmarks/missions_wikidata.geoparquet", "parquet", None),
+    "missions":        ("raw/landmarks/missions.geoparquet", "parquet", None),
+    "grid_cells":      ("normalised/grid_cells.geoparquet", "parquet", None),
+    "grid_adjacency":  ("normalised/grid_adjacency.csv", "csv", None),
+    "segment_cells":   ("normalised/segment_cells.csv", "csv", None),
     # Events and training routes
     "events":          ("normalised/events.csv", "csv", None),
     "waypoints":       ("normalised/waypoints_approved.csv", "csv", ("latitude", "longitude")),
     "route_segments":  ("normalised/route_segment_labels.csv", "csv", None),
     "event_context":   ("normalised/event_context.csv", "csv", None),
+    "cause_targets":   ("normalised/cause_targets.csv", "csv", ("lat", "lon")),
     # Context
     "crimes":          ("normalised/police_monthly_context.csv", "csv", ("latitude", "longitude")),
     "tfl_disruptions": ("normalised/tfl_road_disruption_snapshots.csv", "csv", ("latitude", "longitude")),
@@ -83,13 +88,19 @@ def latest_crawler_parquet(runs_dir: Path) -> Path | None:
 
 
 def segments_sql(route_dir: Path) -> str | None:
-    geo, feats = route_dir / "normalised/segments.geojson", route_dir / "normalised/segment_features.csv"
+    """Street segments with their historical route counts and edge_features columns."""
+    norm = route_dir / "normalised"
+    geo, counts, feats = norm / "segments.geojson", norm / "segment_features.csv", norm / "edge_features.csv"
     if not geo.exists():
         return None
-    if not feats.exists():
-        return reader_sql(geo, "geojson")
-    return (f"SELECT g.*, COALESCE(f.n_published_route_examples, 0) AS n_published_route_examples "
-            f"FROM ST_Read({quote(geo)}) g LEFT JOIN read_csv({quote(feats)}, {CSV_OPTIONS}) f USING (segment_id)")
+    select, joins = ["g.*"], []
+    if counts.exists():
+        select.append("COALESCE(c.n_published_route_examples, 0) AS n_published_route_examples")
+        joins.append(f"LEFT JOIN read_csv({quote(counts)}, {CSV_OPTIONS}) c USING (segment_id)")
+    if feats.exists():
+        select.append("e.* EXCLUDE (segment_id, length_m)")
+        joins.append(f"LEFT JOIN read_csv({quote(feats)}, {CSV_OPTIONS}) e USING (segment_id)")
+    return f"SELECT {', '.join(select)} FROM ST_Read({quote(geo)}) g {' '.join(joins)}"
 
 
 def plan(route_dir: Path, runs_dir: Path) -> dict[str, tuple[Path | None, str | None]]:
@@ -102,10 +113,41 @@ def plan(route_dir: Path, runs_dir: Path) -> dict[str, tuple[Path | None, str | 
             sql = with_points(sql, *point_cols)
         out[table] = (path, sql)
     out["segments"] = (route_dir / "normalised/segments.geojson", segments_sql(route_dir))
+    out["legal_zones"] = (LEGAL_ZONES, f"SELECT zone_id, name, rule_type, legal_basis, notes, geom "
+                                       f"FROM ST_Read({quote(LEGAL_ZONES)})" if LEGAL_ZONES.exists() else None)
     crawler = latest_crawler_parquet(runs_dir)
     out["protest_signals"] = (crawler or runs_dir / "<run>/_all/protests.parquet",
                               with_points(reader_sql(crawler, "parquet"), "latitude", "longitude") if crawler else None)
     return out
+
+
+def table_exists(con, table: str) -> bool:
+    return bool(con.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?", [table]).fetchone()[0])
+
+
+def derive(con) -> dict[str, str]:
+    """Columns and rows that combine several loaded tables."""
+    status = {}
+    if table_exists(con, "targets") and table_exists(con, "missions"):
+        # OSM embassies get the country of the nearest Wikidata mission within 100 m.
+        con.execute("ALTER TABLE targets ADD COLUMN IF NOT EXISTS mission_country VARCHAR")
+        con.execute("""
+            UPDATE targets t SET mission_country = (
+                SELECT arg_min(m.mission_country, meters(m.geometry, t.geometry)) FROM missions m
+                WHERE m.mission_country IS NOT NULL AND meters(m.geometry, t.geometry) < 100)
+            WHERE t.category = 'diplomatic'""")
+        n = con.execute("SELECT COUNT(*) FROM targets WHERE mission_country IS NOT NULL").fetchone()[0]
+        status["targets.mission_country"] = f"{n:,} embassies matched"
+    if table_exists(con, "legal_zones") and table_exists(con, "open_spaces"):
+        con.execute("""
+            INSERT INTO legal_zones
+            SELECT osm_id, name, 'royal_park', 'Royal Parks and Other Open Spaces Regulations 1997', 'from OSM', geometry
+            FROM open_spaces
+            WHERE COALESCE(TRY_CAST(royal_park AS BOOLEAN), false)
+              AND ST_GeometryType(geometry) IN ('POLYGON', 'MULTIPOLYGON')""")
+        n = con.execute("SELECT COUNT(*) FROM legal_zones WHERE rule_type = 'royal_park'").fetchone()[0]
+        status["legal_zones.royal_parks"] = f"{n:,} Royal Park polygons added"
+    return status
 
 
 def load(con, route_dir: Path, runs_dir: Path) -> dict[str, str]:
@@ -124,6 +166,10 @@ def load(con, route_dir: Path, runs_dir: Path) -> dict[str, str]:
             status[table] = f"{rows:,} rows"
         except duckdb.Error as exc:
             status[table] = f"FAILED: {str(exc).splitlines()[0][:150]}"
+    try:
+        status.update(derive(con))
+    except duckdb.Error as exc:
+        status["derived columns"] = f"FAILED: {str(exc).splitlines()[0][:150]}"
     return status
 
 

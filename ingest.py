@@ -7,8 +7,9 @@ protest sources, and load everything into DuckDB (data/protest.duckdb).
 Route data is written under data/route_research/, crawler runs under data/runs/.
 
 If a step fails, the steps that depend on it are skipped and the rest still
-run; a summary is printed at the end. Slow downloads (boundary, osm, landmarks,
-police) are skipped when their outputs already exist; use --refresh to redo them.
+run; a summary is printed at the end. Slow steps (boundary, osm, landmarks,
+missions, police, edge-features, grid) are skipped when their outputs already
+exist; use --refresh to redo them.
 The crawler runs in the background alongside the other steps (log in
 data/runs/ingest_crawl.log). --since (default: 1 January this year) limits the
 police months and the organiser-event window; the seed routes are always all used.
@@ -77,10 +78,12 @@ STEPS = [
          outputs=['raw/boundary/zones_1_2.geojson']),
     Step('osm', 'OSM walk network + main-road network clipped to the boundary', needs=['boundary'],
          outputs=['raw/osm/london_walk.graphml', 'raw/osm/london_main.graphml']),
-    Step('landmarks', 'Targets, open spaces, shops, warehouses, diplomatic missions', needs=['boundary'],
+    Step('landmarks', 'Targets, open spaces, shops, warehouses', needs=['boundary'],
          outputs=['raw/landmarks/targets.geoparquet', 'raw/landmarks/open_spaces.geoparquet',
                   'raw/landmarks/shops.geoparquet', 'raw/landmarks/warehouses.geoparquet'],
          args=lambda a: ['--refresh'] if 'landmarks' in a.refresh_steps else []),
+    Step('missions', 'Embassies/high commissions and their countries from Wikidata', needs=['boundary'],
+         outputs=['raw/landmarks/missions.geoparquet']),
     Step('police', 'Public-order crimes for event months', outputs=['raw/police/police_public_order_context.csv'],
          skip_reason=lambda a: None if police_months(a) else 'no event months since --since inside the police API window',
          args=lambda a: ['--months', *police_months(a)]),
@@ -89,10 +92,16 @@ STEPS = [
          args=lambda a: ['--import-file', a.acled_file] if a.acled_file else ['--end', dt.date.today().isoformat()]),
     Step('seed-coords', 'coordinate_review.csv from the reviewed seed geocodes'),
     Step('normalize', 'Street segments, route labels and context tables', needs=['osm', 'seed-coords']),
+    Step('edge-features', 'Street width/capacity, centrality, junction degree, legal-zone flags', needs=['osm'],
+         outputs=['normalised/edge_features.csv']),
+    Step('grid', 'Hexagon grid, cell neighbours and street-to-cell lookup', needs=['boundary', 'osm'],
+         outputs=['normalised/grid_cells.geoparquet']),
     Step('export-parquet', 'Parquet/GeoParquet copies of the normalised tables', needs=['normalize']),
     Step('weather', 'Hourly Open-Meteo weather around each event date'),
     Step('pageviews', 'Daily Wikipedia views per cause'),
     Step('event-context', 'Per-event calendar, daylight, weather and salience features'),
+    Step('cause-targets', 'Cause -> target table located from the data and checked against seed routes',
+         needs=['normalize', 'event-context']),
     Step('crawl', 'Tier 1 crawlers: Met Police, OSAC, TfL, Marble Arch, organiser sites', kind='crawl',
          background=True, args=lambda a: ['--organizer-event-days-back', str((dt.date.today() - a.since).days),
                                           '--organizer-event-days-ahead', str(ORGANIZER_DAYS_AHEAD)]),

@@ -1,0 +1,21 @@
+cause,target_name,kind,country,iso2,lat,lon,weight,notes
+any,Parliament Square,landmark,,,51.5005,-0.1270,1.0,End point of most national marches
+any,Downing Street (Whitehall gates),landmark,,,51.5034,-0.1270,0.8,
+any,Trafalgar Square,landmark,,,51.5080,-0.1281,0.8,Common rally point
+any,Whitehall (Cenotaph),landmark,,,51.5025,-0.1262,0.6,
+palestine,Israeli Embassy,embassy,Israel,IL,51.5040,-0.1890,0.9,Kensington; police conditions usually keep marches away
+palestine,US Embassy (Nine Elms),embassy,United States,US,51.4825,-0.1270,0.6,
+palestine,BBC Broadcasting House,landmark,,,51.5188,-0.1439,0.4,Assembly point at Portland Place
+palestine,Foreign Office (King Charles Street),landmark,,,51.5026,-0.1279,0.4,
+iran,Iranian Embassy,embassy,Iran,IR,51.5013,-0.1717,0.9,Prince's Gate
+anti_trump,US Embassy (Nine Elms),embassy,United States,US,51.4825,-0.1270,0.9,
+far_right,Home Office (2 Marsham Street),landmark,,,51.4958,-0.1300,0.5,
+anti_racism,Home Office (2 Marsham Street),landmark,,,51.4958,-0.1300,0.5,
+climate_nature,BP headquarters (St James's Square),landmark,,,51.5072,-0.1349,0.5,
+climate_nature,Shell Centre,landmark,,,51.5038,-0.1160,0.5,
+sudan,Sudanese Embassy,embassy,Sudan,SD,51.5052,-0.1393,0.8,Cleveland Row
+ethiopia,Ethiopian Embassy,embassy,Ethiopia,ET,51.5014,-0.1722,0.8,Prince's Gate
+armenia,Turkish Embassy,embassy,Turkey,TR,51.4984,-0.1546,0.8,Belgrave Square; genocide remembrance marches
+kashmir,Pakistan High Commission,embassy,Pakistan,PK,51.4996,-0.1595,0.8,Lowndes Square
+ukraine,Russian Embassy,embassy,Russia,RU,51.5068,-0.1893,0.8,Kensington Palace Gardens
+education,Department for Education (Sanctuary Buildings),landmark,,,51.4985,-0.1316,0.5,

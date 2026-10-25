@@ -40,16 +40,20 @@ This runs every step in dependency order:
 |---|---|---|
 | `boundary` | Zones 1-2 polygon from TfL station zones | `data/route_research/raw/boundary/` |
 | `osm` | OSM walk network + main-road network inside the boundary | `data/route_research/raw/osm/` |
-| `landmarks` | Protest targets, squares/parks (capacity), shops, warehouses, embassies with country | `data/route_research/raw/landmarks/` |
+| `landmarks` | Protest targets, squares/parks (capacity), shops, warehouses | `data/route_research/raw/landmarks/` |
+| `missions` | Embassies/high commissions and the country running each (Wikidata) | `data/route_research/raw/landmarks/missions.*` |
 | `police` | Public-order crimes for the months of the seed events | `data/route_research/raw/police/` |
 | `tfl` | Snapshot of current TfL road disruptions and tube status | `data/route_research/raw/tfl/` |
 | `acled` | ACLED London protest events (only with credentials) | `data/route_research/raw/acled/` |
 | `seed-coords` | Waypoint coordinates from the reviewed geocode cache | `data/route_research/coordinate_review.csv` |
 | `normalize` | Street segments, route labels, context tables | `data/route_research/normalised/` |
+| `edge-features` | Per street: usable width and crowd capacity, betweenness centrality, junction degree, bridge, legal-zone and Royal Park flags | `data/route_research/normalised/edge_features.csv` |
+| `grid` | ~200 m hexagon grid, cell neighbours, street-to-cell lookup | `data/route_research/normalised/grid_*`, `segment_cells.csv` |
 | `export-parquet` | Parquet/GeoParquet copies of the normalised tables | `data/route_research/normalised/parquet/` |
 | `weather` | Hourly Open-Meteo weather around each event date | `data/route_research/raw/weather/` |
 | `pageviews` | Daily Wikipedia views per protest cause | `data/route_research/raw/pageviews/` |
 | `event-context` | Per-event calendar, daylight, weather, media salience features | `data/route_research/normalised/event_context.csv` |
+| `cause-targets` | Where each cause marches to (`seed/cause_targets.csv`), embassies located from the data, checked against the seed routes | `data/route_research/normalised/cause_targets.csv` |
 | `crawl` | Tier 1 crawlers (Met Police, OSAC, TfL, Marble Arch, organiser sites) | `data/runs/<run_id>/` |
 | `database` | Loads all of the above into DuckDB (see [Database](#database)) | `data/protest.duckdb` |
 
@@ -59,7 +63,7 @@ Useful options:
 python ingest.py --list                       # steps and their dependencies
 python ingest.py --only weather event-context # run just these
 python ingest.py --skip crawl acled           # leave these out
-python ingest.py --refresh                    # re-download cached data (boundary, osm, landmarks, police)
+python ingest.py --refresh                    # redo cached steps (boundary, osm, landmarks, missions, police, edge-features, grid)
 python ingest.py --refresh osm                # re-download just one of them
 python ingest.py --acled-file path/to/export.csv
 python ingest.py --since 2024-01-01           # more police/crawler history (default: 1 January this year)
@@ -83,8 +87,9 @@ The dashboard's **Data status** table shows what was loaded and when.
 
 | Group | Tables |
 |---|---|
-| Map | `boundary`, `segments` (walk network, with `n_published_route_examples`), `main_edges` (main roads with lanes/width), `targets`, `open_spaces` (`area_m2` = rally capacity), `shops`, `warehouses`, `missions` |
-| Events and routes | `events`, `waypoints`, `route_segments` (ordered `segment_id`s per `event_id`), `event_context` |
+| Map | `boundary`, `segments` (walk network with `n_published_route_examples` and all `edge_features` columns: `width_m`, `capacity_people`, `betweenness_*`, `*_degree`, `in_*_zone`), `main_edges`, `targets` (embassies have `mission_country`), `open_spaces` (`area_m2` = rally capacity), `shops`, `warehouses`, `missions`, `legal_zones` (no-entry sites, Parliament Square controlled area, Royal Parks) |
+| Grid | `grid_cells` (~200 m hexagons), `grid_adjacency` (neighbouring cells), `segment_cells` (which cells each street crosses) |
+| Events and routes | `events`, `waypoints`, `route_segments` (ordered `segment_id`s per `event_id`), `event_context`, `cause_targets` |
 | Context | `crimes`, `tfl_disruptions`, `acled_events`, `weather_hourly`, `pageviews_daily`, `protest_signals` (latest crawler run) |
 | Bookkeeping | `load_log` (rows and load time per table) |
 

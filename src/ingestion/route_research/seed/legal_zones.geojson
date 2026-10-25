@@ -1,0 +1,31 @@
+{
+  "type": "FeatureCollection",
+  "name": "legal_zones",
+  "_comment": "Hand-drawn APPROXIMATE outlines (lon/lat). no_entry = designated protected sites a march cannot enter (Serious Organised Crime and Police Act 2005 s.128); restricted_activity = controlled area where tents/amplified noise are prohibited but processions can pass (Police Reform and Social Responsibility Act 2011 s.142-143). Royal Parks are added from OSM open_spaces at load time. Event-specific s.12/s.14 conditions are not included.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"zone_id": "palace_of_westminster", "name": "Palace of Westminster", "rule_type": "no_entry",
+                     "legal_basis": "SOCPA 2005 s.128 designated site", "notes": "approximate outline"},
+      "geometry": {"type": "Polygon", "coordinates": [[[-0.12570, 51.50080], [-0.12370, 51.50060], [-0.12390, 51.49820], [-0.12600, 51.49840], [-0.12570, 51.50080]]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"zone_id": "downing_street", "name": "Downing Street (behind the security gates)", "rule_type": "no_entry",
+                     "legal_basis": "SOCPA 2005 s.128 designated site", "notes": "approximate outline; gates at the Whitehall end"},
+      "geometry": {"type": "Polygon", "coordinates": [[[-0.12745, 51.50345], [-0.12740, 51.50325], [-0.12960, 51.50290], [-0.12965, 51.50310], [-0.12745, 51.50345]]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"zone_id": "buckingham_palace", "name": "Buckingham Palace and gardens", "rule_type": "no_entry",
+                     "legal_basis": "SOCPA 2005 s.128 designated site", "notes": "approximate outline"},
+      "geometry": {"type": "Polygon", "coordinates": [[[-0.14850, 51.50250], [-0.14050, 51.50250], [-0.14050, 51.49850], [-0.14850, 51.49850], [-0.14850, 51.50250]]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"zone_id": "parliament_square", "name": "Parliament Square controlled area", "rule_type": "restricted_activity",
+                     "legal_basis": "PRSRA 2011 s.142-143", "notes": "approximate outline of the garden and adjoining footways; processions may pass"},
+      "geometry": {"type": "Polygon", "coordinates": [[[-0.12795, 51.50125], [-0.12620, 51.50135], [-0.12585, 51.50020], [-0.12760, 51.50000], [-0.12795, 51.50125]]]}
+    }
+  ]
+}

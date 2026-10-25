@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download protest-relevant places inside the Zones 1-2 polygon from OSM and Wikidata.
+"""Download protest-relevant places inside the Zones 1-2 polygon from OSM.
 
 Layers (each written as raw/landmarks/<layer>.geoparquet + <layer>.csv):
   targets      embassies/high commissions, government offices, party HQs, town halls,
@@ -8,16 +8,15 @@ Layers (each written as raw/landmarks/<layer>.geoparquet + <layer>.csv):
   shops        every shop=* (shopkeeper warnings)
   warehouses   warehouses, self-storage, industrial land with footprint_m2 as a
                capacity proxy (stock evacuation)
-  missions_wikidata  diplomatic missions with the country that runs them;
-               OSM embassies within 100 m get a `mission_country` from this
+Embassy countries come from download_missions.py (Wikidata), joined in the
+database load.
 
 Requires raw/boundary/zones_1_2.geojson (download_boundary.py).
-Overpass and Wikidata are public services: run sparingly. Busy Overpass servers
+Overpass is a public service: run sparingly. Busy Overpass servers
 (HTTP 429/502/504) are retried with backoff across OVERPASS_URLS. Layers that
 already exist are kept unless --refresh; a failed layer doesn't stop the others.
 """
 import argparse
-import re
 import sys
 import time
 from pathlib import Path
@@ -25,10 +24,8 @@ from pathlib import Path
 import geopandas as gpd
 import osmnx as ox
 import pandas as pd
-import requests
 from osmnx._errors import InsufficientResponseError
 
-USER_AGENT = 'OxfordHack2026-protest-predictor/0.1 (https://github.com/Jakub-Kisielewski/oxhack26)'
 METRIC_CRS = 'EPSG:27700'
 OVERPASS_URLS = ['https://overpass-api.de/api', 'https://overpass.private.coffee/api',
                  'https://overpass.kumi.systems/api']
@@ -49,16 +46,6 @@ KEEP_TAGS = ['name', 'amenity', 'office', 'diplomatic', 'country', 'government',
              'addr:street', 'addr:postcode', 'wikidata']
 # Thousands of small memorials (blue plaques, benches) are not protest targets.
 MINOR_MEMORIALS = {'plaque', 'bench', 'stolperstein', 'blue_plaque', 'stone', 'tree'}
-
-MISSIONS_SPARQL = """
-SELECT ?item ?itemLabel ?countryLabel ?coord WHERE {
-  ?item wdt:P31/wdt:P279* wd:Q7843791 ;
-        wdt:P131* wd:Q84 ;
-        wdt:P625 ?coord .
-  OPTIONAL { ?item wdt:P137 ?country . }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-}"""
-
 
 def target_category(row):
     """Single category per target, most specific first."""
@@ -100,36 +87,6 @@ def prepare(gdf, boundary):
     return gdf
 
 
-def parse_wkt_point(value):
-    m = re.match(r'Point\(([-\d.eE]+) ([-\d.eE]+)\)', value or '')
-    return (float(m.group(1)), float(m.group(2))) if m else (None, None)
-
-
-def fetch_missions(user_agent):
-    r = requests.get('https://query.wikidata.org/sparql', params={'query': MISSIONS_SPARQL, 'format': 'json'},
-                     headers={'User-Agent': user_agent, 'Accept': 'application/sparql-results+json'}, timeout=120)
-    r.raise_for_status()
-    rows = []
-    for b in r.json()['results']['bindings']:
-        lon, lat = parse_wkt_point(b['coord']['value'])
-        if lon is None: continue
-        rows.append({'wikidata': b['item']['value'].rsplit('/', 1)[-1], 'name': b.get('itemLabel', {}).get('value'),
-                     'mission_country': b.get('countryLabel', {}).get('value'), 'lat': lat, 'lon': lon})
-    df = pd.DataFrame(rows).drop_duplicates('wikidata')
-    return gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.lon, df.lat), crs='EPSG:4326')
-
-
-def attach_country(targets, missions, max_m=100):
-    """Give OSM diplomatic targets the operating country of the nearest Wikidata mission."""
-    diplo = targets[targets.category == 'diplomatic'].to_crs(METRIC_CRS)
-    if diplo.empty or missions.empty:
-        targets['mission_country'] = None
-        return targets
-    joined = gpd.sjoin_nearest(diplo[['osm_id', 'geometry']], missions[['mission_country', 'geometry']].to_crs(METRIC_CRS),
-                               max_distance=max_m, how='left').drop_duplicates('osm_id')
-    return targets.merge(joined[['osm_id', 'mission_country']], on='osm_id', how='left')
-
-
 def fetch_features(boundary, tags):
     """features_from_polygon, retrying busy servers; an empty result is not an error."""
     last = None
@@ -149,20 +106,6 @@ def fetch_features(boundary, tags):
     raise RuntimeError(f'Overpass unavailable after {len(BACKOFF_S)} rounds') from last
 
 
-def load_missions(out, boundary, user_agent, refresh):
-    path = out / 'missions_wikidata.geoparquet'
-    if path.exists() and not refresh:
-        return gpd.read_parquet(path)
-    try:
-        missions = fetch_missions(user_agent)
-    except (requests.RequestException, KeyError, ValueError) as exc:
-        print(f'WARNING: Wikidata query failed ({exc.__class__.__name__}); embassies get no mission_country')
-        return None
-    missions = missions[missions.intersects(boundary)]
-    save(missions, out, 'missions_wikidata')
-    return missions
-
-
 def save(gdf, out, layer):
     gdf.to_parquet(out / f'{layer}.geoparquet', index=False)
     gdf.drop(columns='geometry').to_csv(out / f'{layer}.csv', index=False)
@@ -174,8 +117,6 @@ def main():
     p.add_argument('--boundary', default='raw/boundary/zones_1_2.geojson')
     p.add_argument('--outdir', default='raw/landmarks')
     p.add_argument('--layers', nargs='+', choices=list(LAYERS), default=list(LAYERS))
-    p.add_argument('--skip-wikidata', action='store_true')
-    p.add_argument('--user-agent', default=USER_AGENT)
     p.add_argument('--refresh', action='store_true', help='Re-download layers that already exist')
     a = p.parse_args()
     if not Path(a.boundary).exists():
@@ -184,8 +125,6 @@ def main():
     boundary = gpd.read_file(a.boundary).to_crs('EPSG:4326').union_all()
     ox.settings.use_cache = True
     ox.settings.log_console = True
-
-    missions = None if a.skip_wikidata else load_missions(out, boundary, a.user_agent, a.refresh)
 
     failed = []
     for layer in a.layers:
@@ -206,8 +145,6 @@ def main():
         if layer == 'targets':
             gdf = gdf[~col(gdf, 'memorial').isin(MINOR_MEMORIALS)]
             gdf['category'] = gdf.apply(target_category, axis=1)
-            if missions is not None:
-                gdf = attach_country(gdf, missions)
         elif layer == 'open_spaces':
             gdf['kind'] = col(gdf, 'place').fillna(col(gdf, 'leisure'))
             gdf['royal_park'] = col(gdf, 'operator').fillna('').str.contains('Royal Parks')
