@@ -2,15 +2,14 @@
 
 ## HOW TO SETUP
 
-Run these steps in order from the repo root. Steps 1 and 2 are one-off.
+Run these steps in order from the repo root.
 
 | Step | Command | How often |
 |---|---|---|
 | 1. Python environment | `python3.12 -m venv .venv`, activate, `pip install -r requirements.txt` | once |
-| 2. DuckDB spatial extension | manual download, see below | once per machine |
-| 3. Optional credentials | `export ACLED_EMAIL=... ACLED_PASSWORD=... TFL_APP_KEY=...` | if you want those sources |
-| 4. All ingestion | `python ingest.py` | whenever you want fresh data |
-| 5. App | `streamlit run app.py` | |
+| 2. Optional credentials | `export ACLED_EMAIL=... ACLED_PASSWORD=... TFL_APP_KEY=...` | if you want those sources |
+| 3. All ingestion + database | `python ingest.py` (with the app closed) | whenever you want fresh data |
+| 4. App | `streamlit run app.py` | |
 
 ### 1. Python environment
 The repo pins Python 3.12 (`.python-version`).
@@ -21,47 +20,16 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 2. DuckDB spatial extension
-DuckDB runs inside Python, so there is no server to install. The only slow part is the **spatial extension** (~35 MB), which DuckDB downloads silently with no progress bar. On a slow network it looks frozen for 10+ minutes and ignores Ctrl+C, so install it manually **before** running `ingest.py` (its last step creates the database and would otherwise trigger the download).
-`requirements.txt` pins `duckdb==2.0.0`. Extensions are tied to the exact DuckDB version, so don't upgrade it.
+DuckDB's spatial extension comes with `pip install` (the `duckdb-extension-spatial` package) and is installed automatically the first time the database is opened. **Intel Macs** have no wheel for it: see [Spatial extension on Intel Macs](#spatial-extension-on-intel-macs).
 
-```bash
-python -c "import duckdb; print(duckdb.__version__)"            # should print 2.0.0
-python -c "import duckdb; print(duckdb.sql('PRAGMA platform').fetchone()[0])"
-```
-
-Common platforms: `linux_amd64`, `osx_arm64` (Apple Silicon), `osx_amd64` (Intel Mac), `windows_amd64`.
-
-Replace `<platform>` with your value from above (no angle brackets):
-
-```bash
-curl -fL -C - -o spatial.duckdb_extension.gz \
-  https://extensions.duckdb.org/v2.0.0/<platform>/spatial.duckdb_extension.gz
-file spatial.duckdb_extension.gz     # must say "gzip compressed data"
-gunzip spatial.duckdb_extension.gz
-python -c "import duckdb; duckdb.sql(\"INSTALL './spatial.duckdb_extension'\"); print('ok')"
-```
-
-- `-f` makes curl fail on a wrong URL instead of saving an error page, and `-C -` resumes if interrupted.
-- Don't Ctrl+C a slow download. If it does get interrupted, re-run the same command and it will resume.
-- On Windows, use Git Bash or WSL for these commands, or download the `.gz` in a browser and extract it with 7-Zip.
-
-Once it prints `ok`, the extension is cached in `~/.duckdb/extensions/` and works offline from then on. You can delete the `spatial.duckdb_extension` file afterwards (it's gitignored anyway).
-
-Verify that it loads:
-
-```bash
-python -c "import duckdb; c=duckdb.connect(); c.sql('LOAD spatial'); print(c.sql('SELECT ST_Point(0,0)'))"
-```
-
-### 3. Optional credentials
+### 2. Optional credentials
 ```bash
 export ACLED_EMAIL='...' ACLED_PASSWORD='...'   # ACLED step is skipped without these (or use --acled-file)
 export TFL_APP_KEY='...'                          # optional, raises TfL rate limits
 ```
 Never commit credentials.
 
-### 4. Ingestion: one command
+### 3. Ingestion: one command
 ```bash
 python ingest.py
 ```
@@ -83,7 +51,7 @@ This runs every step in dependency order:
 | `pageviews` | Daily Wikipedia views per protest cause | `data/route_research/raw/pageviews/` |
 | `event-context` | Per-event calendar, daylight, weather, media salience features | `data/route_research/normalised/event_context.csv` |
 | `crawl` | Tier 1 crawlers (Met Police, OSAC, TfL, Marble Arch, organiser sites) | `data/runs/<run_id>/` |
-| `database` | Creates the DuckDB schema | `data/protest.duckdb` |
+| `database` | Loads all of the above into DuckDB (see [Database](#database)) | `data/protest.duckdb` |
 
 Useful options:
 
@@ -103,12 +71,50 @@ python ingest.py --since 2024-01-01           # more police/crawler history (def
 - If a step fails, the steps that depend on it are skipped, the rest still run, and a summary is printed at the end. Re-run a failed step with `--only <step>`.
 - Every step can also be run on its own, see `src/ingestion/route_research/README.md`.
 
-> **Current status:** ingestion writes files under `data/route_research/` and `data/runs/`, and the `database` step only creates empty tables. Loading those files into DuckDB, and the UI reading from it, are not built yet.
-
-### 5. Run the app
+### 4. Run the app
 ```bash
 streamlit run app.py
 ```
+The dashboard's **Data status** table shows what was loaded and when.
+
+### Database
+
+`data/protest.duckdb` is the single store that the app, the models and notebooks read from, so none of them need to know file paths or formats. It's rebuilt from the ingestion files by the `database` step (or on its own with `python -m src.database.load`). **Close the Streamlit app first:** it holds the file open and the loader will say so.
+
+| Group | Tables |
+|---|---|
+| Map | `boundary`, `segments` (walk network, with `n_published_route_examples`), `main_edges` (main roads with lanes/width), `targets`, `open_spaces` (`area_m2` = rally capacity), `shops`, `warehouses`, `missions` |
+| Events and routes | `events`, `waypoints`, `route_segments` (ordered `segment_id`s per `event_id`), `event_context` |
+| Context | `crimes`, `tfl_disruptions`, `acled_events`, `weather_hourly`, `pageviews_daily`, `protest_signals` (latest crawler run) |
+| Bookkeeping | `load_log` (rows and load time per table) |
+
+Geometry columns are lon/lat (EPSG:4326): `geom` on point and street tables, `geometry` on landmark layers. Use the `meters(a, b)` macro for distances; it works for points, lines and polygons. Don't use `ST_Distance_Sphere` directly: it expects lat/lon axis order.
+
+```python
+from src.database.db import get_connection
+con = get_connection(read_only=True)
+
+# Pin query: nearest street segment to a clicked point
+con.execute("""SELECT segment_id, street_name, meters(geom, ST_Point(?, ?)) AS m
+               FROM segments ORDER BY m LIMIT 1""", [lon, lat]).df()
+
+# Shops within 100 m of a historical route
+con.execute("""SELECT DISTINCT s.name, s.shop FROM route_segments r
+               JOIN segments g USING (segment_id)
+               JOIN shops s ON meters(s.geometry, g.geom) < 100
+               WHERE r.event_id = ?""", ["2023-10-21-psc"]).df()
+```
+
+### Spatial extension on Intel Macs
+`pip` skips `duckdb-extension-spatial` on Intel Macs because there is no wheel, so install the extension once by hand. Extensions are tied to the exact DuckDB version, so keep `duckdb==1.5.5`.
+
+```bash
+curl -fL -C - -o spatial.duckdb_extension.gz \
+  https://extensions.duckdb.org/v1.5.5/osx_amd64/spatial.duckdb_extension.gz
+gunzip spatial.duckdb_extension.gz
+python -c "import duckdb; duckdb.connect().execute(\"INSTALL './spatial.duckdb_extension'\"); print('ok')"
+```
+DuckDB downloads extensions silently with no progress bar, which is why this is done with curl (`-C -` resumes an interrupted download). Once it prints `ok` the extension is cached in `~/.duckdb/extensions/` and you can delete the file.
 
 ## LIST OF APIS CURRENTLY USED
 https://news.met.police.uk/latest_news/tag/central-london

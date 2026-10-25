@@ -3,8 +3,8 @@
 
 Steps (see --list) download the zones 1-2 map, landmarks, police/TfL/ACLED
 context, build the training routes and per-event features, crawl the live
-protest sources, and create the DuckDB schema. Route data is written under
-data/route_research/, crawler runs under data/runs/.
+protest sources, and load everything into DuckDB (data/protest.duckdb).
+Route data is written under data/route_research/, crawler runs under data/runs/.
 
 If a step fails, the steps that depend on it are skipped and the rest still
 run; a summary is printed at the end. Slow downloads (boundary, osm, landmarks,
@@ -96,7 +96,7 @@ STEPS = [
     Step('crawl', 'Tier 1 crawlers: Met Police, OSAC, TfL, Marble Arch, organiser sites', kind='crawl',
          background=True, args=lambda a: ['--organizer-event-days-back', str((dt.date.today() - a.since).days),
                                           '--organizer-event-days-ahead', str(ORGANIZER_DAYS_AHEAD)]),
-    Step('database', 'Create the DuckDB schema in data/protest.duckdb', kind='database'),
+    Step('database', 'Load all outputs into data/protest.duckdb', kind='database'),
 ]
 BY_NAME = {s.name: s for s in STEPS}
 
@@ -106,14 +106,8 @@ def run_step(step: Step, args) -> int:
         return route_pipeline.main(['--workdir', str(args.workdir), step.name, *step.args(args)])
     if step.kind == 'crawl':
         return subprocess.run(crawl_command(step, args), cwd=ROOT, check=False).returncode
-    from src.database.db import get_connection, init_schema
-    con = get_connection()
-    try:
-        init_schema(con)
-        print('Tables:', ', '.join(t for (t,) in con.execute('SHOW TABLES').fetchall()))
-    finally:
-        con.close()
-    return 0
+    from src.database import load
+    return load.main([])
 
 
 def crawl_command(step: Step, args) -> list[str]:

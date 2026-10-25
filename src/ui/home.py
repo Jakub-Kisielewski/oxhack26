@@ -16,3 +16,12 @@ if st.button("🗺️ Open Zone 1 & 2 Map", type="primary"):
     st.switch_page("src/ui/map_view.py")
 
 conn = get_db()
+
+st.subheader("Data status")
+status = conn.execute(
+    "SELECT table_name, rows, loaded_at FROM load_log ORDER BY table_name"
+).df()
+if status.empty:
+    st.info("No data loaded yet. Run `python ingest.py` with the app closed, then reopen it.")
+else:
+    st.dataframe(status, hide_index=True)

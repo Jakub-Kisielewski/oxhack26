@@ -8,17 +8,14 @@ st.set_page_config(page_title="London Protest Predictor", layout="wide")
 def bootstrap() -> bool:
     """Runs ONCE per server process, before any page opens a read-only connection.
 
-    Ensures the schema exists and (later) triggers ingestion. It uses a
-    read-write connection that is CLOSED before the pages open their
-    read-only ones, so we never hold two conflicting locks on the DB file.
+    Ensures the schema exists; the data itself is loaded by `python ingest.py`
+    (src/database/load.py). It uses a read-write connection that is CLOSED
+    before the pages open their read-only ones, so we never hold two
+    conflicting locks on the DB file.
     """
     con = get_connection(read_only=False)
     try:
         init_schema(con)
-        # TODO: wire ingestion here once src/ingestion scripts exist, e.g.:
-        # from src.ingestion.police_api import ingest_police
-        # if con.execute("SELECT COUNT(*) FROM crimes").fetchone()[0] == 0:
-        #     ingest_police(con)
     finally:
         con.close()           # release the write lock before pages open read-only
     return True

@@ -1,0 +1,158 @@
+"""Load the ingestion outputs into data/protest.duckdb: `python -m src.database.load`
+
+Every table is rebuilt from its source file on each run (CREATE OR REPLACE), so
+the database always matches the latest ingestion. Missing files are skipped and
+a failing table doesn't stop the others. Point tables get a `geom` column
+(EPSG:4326 lon/lat) for spatial queries; map layers keep their OSM geometry.
+
+The Streamlit app holds the database open; close it before loading.
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import sys
+from pathlib import Path
+
+import duckdb
+
+from src.database.db import DB_PATH, get_connection, init_schema
+
+ROOT = Path(__file__).resolve().parents[2]
+ROUTE_DIR = ROOT / "data" / "route_research"
+RUNS_DIR = ROOT / "data" / "runs"
+
+# table -> (source path relative to the route workspace, reader, (lat, lon) columns for geom)
+TABLES = {
+    # Map
+    "boundary":        ("raw/boundary/zones_1_2.geojson", "geojson", None),
+    "main_edges":      ("raw/osm/london_main_edges.geojson", "geojson", None),
+    "targets":         ("raw/landmarks/targets.geoparquet", "parquet", None),
+    "open_spaces":     ("raw/landmarks/open_spaces.geoparquet", "parquet", None),
+    "shops":           ("raw/landmarks/shops.geoparquet", "parquet", None),
+    "warehouses":      ("raw/landmarks/warehouses.geoparquet", "parquet", None),
+    "missions":        ("raw/landmarks/missions_wikidata.geoparquet", "parquet", None),
+    # Events and training routes
+    "events":          ("normalised/events.csv", "csv", None),
+    "waypoints":       ("normalised/waypoints_approved.csv", "csv", ("latitude", "longitude")),
+    "route_segments":  ("normalised/route_segment_labels.csv", "csv", None),
+    "event_context":   ("normalised/event_context.csv", "csv", None),
+    # Context
+    "crimes":          ("normalised/police_monthly_context.csv", "csv", ("latitude", "longitude")),
+    "tfl_disruptions": ("normalised/tfl_road_disruption_snapshots.csv", "csv", ("latitude", "longitude")),
+    "acled_events":    ("normalised/acled_event_points.csv", "csv", ("latitude", "longitude")),
+    "weather_hourly":  ("raw/weather/hourly.csv", "csv", None),
+    "pageviews_daily": ("raw/pageviews/daily.csv", "csv", None),
+}
+
+
+def quote(path: Path) -> str:
+    return "'" + path.as_posix().replace("'", "''") + "'"
+
+
+def reader_sql(path: Path, reader: str) -> str:
+    if reader == "csv":
+        return f"SELECT * FROM read_csv({quote(path)}, header = true)"
+    if reader == "geojson":
+        return f"SELECT * FROM ST_Read({quote(path)})"
+    return f"SELECT * FROM read_parquet({quote(path)})"
+
+
+def with_points(sql: str, lat: str, lon: str) -> str:
+    return (f"SELECT *, CASE WHEN TRY_CAST({lon} AS DOUBLE) IS NOT NULL AND TRY_CAST({lat} AS DOUBLE) IS NOT NULL "
+            f"THEN ST_Point(TRY_CAST({lon} AS DOUBLE), TRY_CAST({lat} AS DOUBLE)) END AS geom FROM ({sql})")
+
+
+def fix_wkb_geometry(con, table: str) -> None:
+    """GeoParquet geometry arrives as GEOMETRY when spatial reads it, but older files may be raw WKB."""
+    for name, dtype in con.execute(f"SELECT column_name, data_type FROM information_schema.columns "
+                                   f"WHERE table_name = '{table}'").fetchall():
+        if name == "geometry" and dtype == "BLOB":
+            con.execute(f"ALTER TABLE {table} ALTER geometry TYPE GEOMETRY USING ST_GeomFromWKB(geometry)")
+
+
+def latest_crawler_parquet(runs_dir: Path) -> Path | None:
+    """Newest crawler run with a non-empty merged parquet (empty runs write a 0-byte file)."""
+    files = sorted(runs_dir.glob("*/_all/protests.parquet"), reverse=True)
+    return next((f for f in files if f.stat().st_size > 0), None)
+
+
+def segments_sql(route_dir: Path) -> str | None:
+    geo, feats = route_dir / "normalised/segments.geojson", route_dir / "normalised/segment_features.csv"
+    if not geo.exists():
+        return None
+    if not feats.exists():
+        return reader_sql(geo, "geojson")
+    return (f"SELECT g.*, COALESCE(f.n_published_route_examples, 0) AS n_published_route_examples "
+            f"FROM ST_Read({quote(geo)}) g LEFT JOIN read_csv({quote(feats)}, header = true) f USING (segment_id)")
+
+
+def plan(route_dir: Path, runs_dir: Path) -> dict[str, tuple[Path | None, str | None]]:
+    """table -> (source file, SELECT) or (path, None) when the source is missing."""
+    out = {}
+    for table, (rel, reader, point_cols) in TABLES.items():
+        path = route_dir / rel
+        sql = reader_sql(path, reader) if path.exists() else None
+        if sql and point_cols:
+            sql = with_points(sql, *point_cols)
+        out[table] = (path, sql)
+    out["segments"] = (route_dir / "normalised/segments.geojson", segments_sql(route_dir))
+    crawler = latest_crawler_parquet(runs_dir)
+    out["protest_signals"] = (crawler or runs_dir / "<run>/_all/protests.parquet",
+                              with_points(reader_sql(crawler, "parquet"), "latitude", "longitude") if crawler else None)
+    return out
+
+
+def load(con, route_dir: Path, runs_dir: Path) -> dict[str, str]:
+    init_schema(con)
+    status = {}
+    for table, (path, sql) in plan(route_dir, runs_dir).items():
+        if sql is None:
+            status[table] = f"skipped (missing {path})"
+            continue
+        try:
+            con.execute(f"CREATE OR REPLACE TABLE {table} AS {sql}")
+            fix_wkb_geometry(con, table)
+            rows = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            con.execute("INSERT OR REPLACE INTO load_log VALUES (?, ?, ?, ?)",
+                        [table, str(path), rows, dt.datetime.now()])
+            status[table] = f"{rows:,} rows"
+        except duckdb.Error as exc:
+            status[table] = f"FAILED: {str(exc).splitlines()[0][:150]}"
+    return status
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--db", type=Path, default=DB_PATH)
+    p.add_argument("--route-dir", type=Path, default=ROUTE_DIR)
+    p.add_argument("--runs-dir", type=Path, default=RUNS_DIR)
+    a = p.parse_args(argv)
+    try:
+        con = get_connection(path=a.db)
+    except duckdb.IOException as exc:
+        if "lock" in str(exc).lower():
+            print(f"{a.db} is open in another process (is the Streamlit app running?). Close it and retry.",
+                  file=sys.stderr)
+            return 1
+        if "newer version of DuckDB" not in str(exc):
+            raise
+        # Every table is rebuilt from the ingestion files, so a file from another
+        # DuckDB version (e.g. 2.0) can be set aside and recreated.
+        old = a.db.with_suffix(a.db.suffix + ".old")
+        a.db.replace(old)
+        print(f"{a.db.name} was written by a newer DuckDB; moved it to {old.name} and rebuilding")
+        con = get_connection(path=a.db)
+    try:
+        status = load(con, a.route_dir, a.runs_dir)
+    finally:
+        con.close()
+    width = max(map(len, status))
+    for table, s in status.items():
+        print(f"{table:<{width}}  {s}")
+    print(f"Database: {a.db}")
+    return 1 if any(s.startswith("FAILED") for s in status.values()) else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
