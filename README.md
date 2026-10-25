@@ -9,7 +9,20 @@ Run these steps in order from the repo root.
 | 1. Python environment | `python3.12 -m venv .venv`, activate, `pip install -r requirements.txt` | once |
 | 2. Optional credentials | `export ACLED_EMAIL=... ACLED_PASSWORD=... TFL_APP_KEY=...` | if you want those sources |
 | 3. All ingestion + database | `python ingest.py` (with the app closed) | whenever you want fresh data |
-| 4. App | `streamlit run app.py` | |
+| 4. Train the route model | `python -m src.models.train` | after each ingestion |
+| 5. Check model and UI agree | `python -m src.contract.selftest` | after training, before pushing |
+| 6. App | `streamlit run app.py` | |
+
+Quick version, from a fresh clone:
+
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python ingest.py                     # data -> data/protest.duckdb
+python -m src.models.train           # model -> data/models/
+python -m src.contract.selftest      # should print PASS for mock and real
+streamlit run app.py
+```
 
 ### 1. Python environment
 The repo pins Python 3.12 (`.python-version`).
@@ -74,11 +87,38 @@ python ingest.py --since 2024-01-01           # more police/crawler history (def
 - If a step fails, the steps that depend on it are skipped, the rest still run, and a summary is printed at the end. Re-run a failed step with `--only <step>`.
 - Every step can also be run on its own, see `src/ingestion/route_research/README.md`.
 
-### 4. Run the app
+### 4. Train the route model
+```bash
+python -m src.models.train           # full leave-one-event-out backtest
+python -m src.models.train --quick   # 5-event smoke test while developing (don't report its numbers)
+python -m src.models.checks          # optional sanity checks on the trained model
+```
+Training reads `data/protest.duckdb` read-only and writes `data/models/graph.pkl`, `route_model.json` and
+`backtest.json`. It prints the backtest against the shortest-path and random-walk baselines, and warns if the
+route model doesn't beat shortest path. Re-train after every ingestion. Add `--force-graph` to rebuild the
+street graph. See `src/models/README.md`.
+
+### 5. Check the model and UI agree
+```bash
+python -m src.contract.selftest                    # mock and (if trained) real predictor
+python -m src.contract.selftest --predictor real   # just the trained model
+```
+Runs every model method through the shared contract (`src/contract/`) and checks types, probability ranges,
+coordinate order and sorting. Both should print `PASS`. Run it before every push.
+
+### 6. Run the app
 ```bash
 streamlit run app.py
 ```
-The dashboard's **Data status** table shows what was loaded and when.
+- The app uses the trained model automatically when `data/models/` exists, otherwise a **mock predictor**
+  (a yellow banner says so). Force one with `PREDICTOR=mock` or `PREDICTOR=real`.
+- Trained a model while the app was running? Press **Reload model** on the dashboard.
+- The dashboard's **Data status** table shows what was loaded and when.
+- **Maps blank?** The map views need WebGL. If the browser console says `Failed to create WebGL context`,
+  turn on graphics acceleration (Chrome: Settings → System → *Use graphics acceleration when available*,
+  then restart; check `chrome://gpu`). If your GPU is blocklisted, enable `chrome://flags/#ignore-gpu-blocklist`,
+  or try Firefox.
+- Close the app before re-running `python ingest.py`: it holds the database open.
 
 ### Database
 
