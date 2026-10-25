@@ -87,8 +87,7 @@ def show(prediction: Prediction) -> None:
         st.markdown("**Rowdiness**")
         level = risk_level(c.rowdiness)
         common.risk_badge(level)
-        st.metric("Volatility score", f"{c.rowdiness:.2f}", help="0-1. Raises the chance of breakaways towards nearby "
-                                                                 "targets in the planned-route analysis.")
+        st.metric("Volatility score", f"{c.rowdiness:.2f}")
         for e in [e for e in effects if e.target == "rowdiness"]:
             st.markdown(f"- **{e.factor}** ({e.value}): {e.effect}. {e.description}")
     with right:
@@ -100,10 +99,3 @@ def show(prediction: Prediction) -> None:
             st.markdown("**Duration**")
             for e in dur:
                 st.markdown(f"- **{e.factor}** ({e.value}): {e.effect}. {e.description}")
-
-    with st.expander("All factors and their basis"):
-        st.dataframe(pd.DataFrame([{"Affects": TARGET.get(e.target, e.target), "Factor": e.factor, "Input": e.value,
-                                    "Effect": e.effect, "Basis": BASIS.get(e.basis, e.basis), "Why": e.description}
-                                   for e in effects]), hide_index=True, width="stretch")
-        st.caption("Learned effects come from the route model fitted on past marches. Hand-set assumptions fill in "
-                   "where there are too few past marches to fit an effect (e.g. turnout counts).")
