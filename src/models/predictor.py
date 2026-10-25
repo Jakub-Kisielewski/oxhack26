@@ -60,7 +60,8 @@ class RealPredictor:
         ends=candidates(req.context.cause,self.events,req.end)
         if not ends:
             raise PredictionError('No candidate destinations. Provide a destination or train with historical events.')
-        context={'turnout':turnout.expected,'cause':req.context.cause,'precip_mm_4h':c['precip_mm_4h']}
+        context={'turnout':turnout.expected,'cause':req.context.cause,'precip_mm_4h':c['precip_mm_4h'],
+                 'dark_fraction':c['dark_fraction']}
         segs,cells,routes,drivers,warnings=infer(self.graph,self.model,req.start,ends,context,
             self.history,mapdata.cause_targets,req.exclusion_zones,max(1,min(int(req.n_routes),10)))
         if not routes:warnings.append('No connected route found; check start, end and exclusion areas.')

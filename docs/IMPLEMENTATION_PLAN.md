@@ -599,8 +599,9 @@ Goal: `RealPredictor` implementing `Predictor`, with trained artefacts in `data/
 8. `royal_park` and `restricted` flags.
 9. `history`: `log1p(n_published_route_examples)`, recomputed **from training events only** (in the backtest, exclude the held-out event).
 10. `rain_x_main`: `precip_mm_4h > 0.5` × `is_main`.
+11. `dark_x_main`: share of the first 4 h after sunset (from `daylight_after_start_h`) × `is_main`. Prior +0.5: if no training march ran after dark, the fit leaves it at the prior. Older model files without it load with the prior until retrained.
 
-Context-only variables (weather, cause, organiser) cancel out in a conditional logit unless they're **interacted with a segment feature**. That's why turnout, rain and cause enter through 3, 10 and 7. Standardise features using training statistics.
+Context-only variables (weather, cause, organiser) cancel out in a conditional logit unless they're **interacted with a segment feature**. That's why turnout, rain, darkness and cause enter through 3, 10, 11 and 7. Standardise features using training statistics.
 
 **A4. Route model** (`route_model.py`)
 - `P(b | a) = softmax_b(θ · x(a, b, c, d))` over the candidate next segments.

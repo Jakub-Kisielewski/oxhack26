@@ -8,10 +8,10 @@ from src.models.labels import TrainingEvent
 def base(context:MarchContext,events:list[TrainingEvent])->tuple[int,str]:
     """Median turnout of past marches with this cause (all marches if the cause is unknown or unseen)."""
     sample=[int(e.context['turnout']) for e in events if context.cause and e.cause==context.cause]
-    label=f'median of {len(sample)} past {context.cause.replace("_"," ")} marches' if sample else ''
+    label=f'median of past {context.cause.replace("_"," ")} marches' if sample else ''
     if not sample:
         sample=[int(e.context['turnout']) for e in events]
-        label=f'median of all {len(sample)} past marches' if sample else 'default'
+        label='median of all past marches' if sample else 'default'
     return (int(statistics.median(sample)) if sample else 10000),label
 
 

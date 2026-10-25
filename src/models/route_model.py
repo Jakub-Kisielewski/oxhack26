@@ -12,7 +12,9 @@ from src.models.labels import TrainingEvent,history_counts
 from src.models.graph import MarchGraph
 
 # Shrink noisy estimates toward small, interpretable prior effects (standardised features).
-PRIOR=np.array([.5,.1,.05,.1,.1,-.5,.1,-.15,-.3,.05,.05],dtype=float)
+# dark_x_main gets a real prior (+0.5: after dark, marches keep to main, lit roads) because most training
+# marches finish in daylight; with no dark marches the fit leaves it at this prior.
+PRIOR=np.array([.5,.1,.05,.1,.1,-.5,.1,-.15,-.3,.05,.05,.5],dtype=float)
 
 @dataclass
 class ChoiceModel:
@@ -32,8 +34,13 @@ class ChoiceModel:
     @classmethod
     def from_json(cls,path:Path):
         with open(path) as f:d=json.load(f)
-        if list(d['features'])!=list(NAMES):raise ValueError('Feature version mismatch; retrain model')
-        return cls(d['theta'],d['mean'],d['std'],tuple(d['features']),d['fitted'],d['stats'])
+        saved=list(d['features'])
+        if saved!=list(NAMES)[:len(saved)]:raise ValueError('Feature version mismatch; retrain model')
+        # Older model files lack newer, appended features: those run at their prior until retrained.
+        n=len(saved)
+        return cls(list(d['theta'])+PRIOR[n:].tolist(),list(d['mean'])+[0.0]*(len(NAMES)-n),
+                   list(d['std'])+[1.0]*(len(NAMES)-n),NAMES,d['fitted'],
+                   {**d['stats'],'prior_only':list(NAMES[n:])})
 
     def probs(self,g:MarchGraph,current:str, candidates:list[str],destination:tuple[float,float],
               context:dict|None=None,history:dict|None=None,targets:list|None=None):

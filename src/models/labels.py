@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from src.contract import mapdata
+from src.models.features import dark_fraction
 from src.models.graph import MarchGraph
 
 INTERPOLATED_WEIGHT=0.3
@@ -20,8 +21,9 @@ class TrainingEvent:
 
 def read_events(g:MarchGraph, interpolated_weight:float=INTERPOLATED_WEIGHT)->list[TrainingEvent]:
     historic=mapdata.historical_events(protests_only=True)
-    rows=mapdata.cursor().execute('''SELECT event_id, precip_mm_4h FROM event_context''').fetchall()
-    rains={str(k):float(x or 0) for k,x in rows}
+    rows=mapdata.cursor().execute('''SELECT event_id, precip_mm_4h, daylight_after_start_h FROM event_context''').fetchall()
+    rains={str(k):float(x or 0) for k,x,_ in rows}
+    darks={str(k):dark_fraction(d) for k,_,d in rows}
     output=[]
     for e in historic:
         if len(e.waypoints)<2:continue
@@ -33,7 +35,8 @@ def read_events(g:MarchGraph, interpolated_weight:float=INTERPOLATED_WEIGHT)->li
             seg=g.segments[sid]
             weights.append(1.0 if min(mapdata.distance_m(seg.mid,p) for p in pts)<=150 else interpolated_weight)
         output.append(TrainingEvent(e.event_id,e.date,e.cause,
-                      {'turnout': e.turnout or 10000,'precip_mm_4h':rains.get(e.event_id,0)},
+                      {'turnout': e.turnout or 10000,'precip_mm_4h':rains.get(e.event_id,0),
+                       'dark_fraction':darks.get(e.event_id,0)},
                       pts[-1],route,weights))
     return output
 
