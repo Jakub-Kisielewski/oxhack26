@@ -187,7 +187,7 @@ def cells_for_segments(ids: list[str]) -> dict[str, int]:
 
 @lru_cache(maxsize=1)
 def boundary() -> list[Path]:
-    """TfL zones 1–2 boundary polygon rings."""
+    """TfL zones 1-2 boundary polygon rings."""
     rings = []
     for (geo,) in cursor().execute("SELECT ST_AsGeoJSON(geom) FROM boundary").fetchall():
         rings.extend(_rings(geo))
@@ -213,9 +213,7 @@ def legal_zones() -> list[dict]:
 def targets(categories: list[str] | None = None) -> list[dict]:
     """Embassy and landmark targets, optionally filtered by ``categories``."""
     country_sel = "country" if _has_column("targets", "country") else "NULL"
-    sql = (
-        f"SELECT name, category, {country_sel}, lon, lat FROM targets WHERE lat IS NOT NULL"  # noqa: S608 — country_sel is country|NULL literal
-    )
+    sql = f"SELECT name, category, {country_sel}, lon, lat FROM targets WHERE lat IS NOT NULL"  # noqa: S608 — country_sel is country|NULL literal
     params = []
     if categories:
         sql += " AND category IN (SELECT UNNEST(?))"
@@ -386,7 +384,7 @@ def assembly_points() -> list[dict]:
 
 
 def in_boundary(lonlat: LonLat) -> bool:
-    """True when ``lonlat`` lies inside the zones 1–2 boundary."""
+    """True when ``lonlat`` lies inside the zones 1-2 boundary."""
     return bool(
         cursor()
         .execute("SELECT bool_or(ST_Contains(geom, ST_Point(?, ?))) FROM boundary", list(lonlat))
