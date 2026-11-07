@@ -49,10 +49,9 @@ This runs every step in dependency order:
 | `landmarks` | Protest targets, squares/parks (capacity), shops, warehouses | `data/route_research/raw/landmarks/` |
 | `seed-coords` | Waypoint coordinates from the reviewed geocode cache | `data/route_research/coordinate_review.csv` |
 | `normalize` | Street segments, route labels, context tables | `data/route_research/normalised/` |
-| `edge-features` | Per street: usable width and crowd capacity, betweenness centrality, junction degree, bridge, legal-zone and Royal Park flags | `data/route_research/normalised/edge_features.csv` |
-| `weather` | Hourly Open-Meteo weather around each event date | `data/route_research/raw/weather/` |
-| `pageviews` | Daily Wikipedia views per protest cause | `data/route_research/raw/pageviews/` |
-| `event-context` | Per-event calendar, daylight, weather, media salience features | `data/route_research/normalised/event_context.csv` |
+| `edge-features` | Per street: usable width, main-network betweenness, junction degree, legal-zone and Royal Park flags | `data/route_research/normalised/edge_features.csv` |
+| `weather` | Hourly Open-Meteo precipitation around each event date | `data/route_research/raw/weather/` |
+| `event-context` | Per-event cause, 4 h precipitation, daylight after start (model context) | `data/route_research/normalised/event_context.csv` |
 | `cause-targets` | Where each cause marches to (`seed/cause_targets.csv`), embassies located from the data, checked against the seed routes | `data/route_research/normalised/cause_targets.csv` |
 | `database` | Loads all of the above into DuckDB (see [Database](#database)) | `data/protest.duckdb` |
 
@@ -110,10 +109,10 @@ streamlit run app.py
 
 | Group | Tables |
 |---|---|
-| Map | `boundary`, `segments` (walk network with `n_published_route_examples` and all `edge_features` columns: `width_m`, `capacity_people`, `betweenness_*`, `*_degree`, `in_*_zone`), `main_edges`, `targets` (embassies have an ISO `country` code), `open_spaces` (`area_m2` = rally capacity), `shops`, `warehouses`, `legal_zones` (no-entry sites, Parliament Square controlled area, Royal Parks) |
+| Map | `boundary`, `segments` (walk network with `n_published_route_examples` and `edge_features`: `width_m`, `betweenness_main`, `to_degree`, `is_main`, `in_*_zone`), `main_edges`, `targets` (embassies have an ISO `country` code), `legal_zones` (no-entry sites, Parliament Square controlled area, Royal Parks from seed + OSM) |
 | Grid | `grid_cells` (~200 m hexagons), `grid_adjacency` (neighbouring cells), `segment_cells` (which cells each street crosses) |
 | Events and routes | `events`, `waypoints`, `route_segments` (ordered `segment_id`s per `event_id`), `event_context`, `cause_targets` |
-| Context | `weather_hourly`, `pageviews_daily` |
+| Context | (weather and pageview tables removed; files under `raw/weather/` and landmarks parquet are read by pipeline steps) |
 | Bookkeeping | `load_log` (rows and load time per table) |
 
 Geometry columns are lon/lat (EPSG:4326): `geom` on point and street tables, `geometry` on landmark layers. Use the `meters(a, b)` macro for distances; it works for points, lines and polygons. Don't use `ST_Distance_Sphere` directly: it expects lat/lon axis order.

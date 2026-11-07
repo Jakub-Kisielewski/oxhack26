@@ -63,13 +63,12 @@ STEPS = [
     ),
     Step(
         "edge-features",
-        "Street width/capacity, centrality, junction degree, legal-zone flags",
+        "Street width, main-network betweenness, junction degree, legal-zone flags",
         needs=["osm", "landmarks"],
         outputs=["normalised/edge_features.csv"],
     ),
     Step("weather", "Hourly Open-Meteo weather around each event date"),
-    Step("pageviews", "Daily Wikipedia views per cause"),
-    Step("event-context", "Per-event calendar, daylight, weather and salience features"),
+    Step("event-context", "Per-event cause, precipitation and daylight (model context)"),
     Step(
         "cause-targets",
         "Cause -> target table located from the data and checked against seed routes",

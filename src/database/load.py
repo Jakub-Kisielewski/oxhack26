@@ -14,14 +14,11 @@ from src.database.db import DB_PATH, get_connection, init_schema
 TABLES = {
     "boundary": ("raw/boundary/zones_1_2.geojson", "geojson", None),
     "targets": ("raw/landmarks/targets.geoparquet", "parquet", None),
-    "open_spaces": ("raw/landmarks/open_spaces.geoparquet", "parquet", None),
     "events": ("normalised/events.csv", "csv", None),
     "waypoints": ("normalised/waypoints_approved.csv", "csv", ("latitude", "longitude")),
     "route_segments": ("normalised/route_segment_labels.csv", "csv", None),
     "event_context": ("normalised/event_context.csv", "csv", None),
     "cause_targets": ("normalised/cause_targets.csv", "csv", ("lat", "lon")),
-    "weather_hourly": ("raw/weather/hourly.csv", "csv", None),
-    "pageviews_daily": ("raw/pageviews/daily.csv", "csv", None),
 }
 
 CSV_OPTIONS = "header = true, sample_size = -1"
@@ -96,13 +93,14 @@ def table_exists(con, table: str) -> bool:
     )
 
 
-def derive(con) -> dict[str, str]:
+def derive(con, route_dir: Path) -> dict[str, str]:
     status = {}
-    if table_exists(con, "legal_zones") and table_exists(con, "open_spaces"):
-        con.execute("""
+    open_spaces = route_dir / "raw/landmarks/open_spaces.geoparquet"
+    if table_exists(con, "legal_zones") and open_spaces.exists():
+        con.execute(f"""
             INSERT INTO legal_zones
             SELECT osm_id, name, 'royal_park', 'Royal Parks and Other Open Spaces Regulations 1997', 'from OSM', geometry
-            FROM open_spaces
+            FROM read_parquet({quote(open_spaces)})
             WHERE COALESCE(TRY_CAST(royal_park AS BOOLEAN), false)
               AND ST_GeometryType(geometry) IN ('POLYGON', 'MULTIPOLYGON')""")
         n = con.execute("SELECT COUNT(*) FROM legal_zones WHERE rule_type = 'royal_park'").fetchone()[0]
@@ -129,7 +127,7 @@ def load(con, route_dir: Path) -> dict[str, str]:
         except duckdb.Error as exc:
             status[table] = f"FAILED: {str(exc).splitlines()[0][:150]}"
     try:
-        status.update(derive(con))
+        status.update(derive(con, route_dir))
     except duckdb.Error as exc:
         status["derived"] = f"FAILED: {str(exc).splitlines()[0][:150]}"
     return status

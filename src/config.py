@@ -39,18 +39,10 @@ QUICK_BACKTEST_EVENTS = 5
 BOUNDARY_BUFFER_M = 300.0
 BOUNDARY_HULL_RATIO = 0.3
 MAX_SNAP_DISTANCE_M = 350.0
-EDGE_BETWEENNESS_SAMPLES = 150
-EDGE_BETWEENNESS_SEED = 42
-
 # External APIs (no keys in repo)
 TFL_API_BASE = "https://api.tfl.gov.uk"
 OPEN_METEO_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
 OPEN_METEO_FORECAST = "https://api.open-meteo.com/v1/forecast"
-WIKIMEDIA_PAGEVIEWS_API = (
-    "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/"
-    "en.wikipedia/all-access/user/{article}/daily/{start}/{end}"
-)
-UK_BANK_HOLIDAYS_URL = "https://www.gov.uk/bank-holidays.json"
 OVERPASS_URLS = (
     "https://overpass-api.de/api",
     "https://overpass.private.coffee/api",

@@ -140,8 +140,11 @@ def from_database() -> MarchGraph:
     rows=cur.execute('''
         SELECT segment_id, CAST(u AS VARCHAR), CAST(v AS VARCHAR),
           length_m, road_class, street_name, width_m,
-          COALESCE(betweenness_main,betweenness_walk,0), to_degree,
-          is_main,is_bridge,is_tunnel,in_no_entry_zone,in_restricted_zone,in_royal_park,
+          COALESCE(betweenness_main,0), to_degree,
+          is_main,
+          COALESCE(TRY_CAST(is_bridge AS BOOLEAN), false),
+          COALESCE(TRY_CAST(is_tunnel AS BOOLEAN), false),
+          in_no_entry_zone,in_restricted_zone,in_royal_park,
           ST_AsGeoJSON(geom)
         FROM segments WHERE geom IS NOT NULL
     ''').fetchall()

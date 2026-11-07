@@ -2,28 +2,16 @@
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
-import subprocess
-import sys
 from pathlib import Path
+
+from src.ingestion.route_research import steps
 
 HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = HERE.parents[2]
 DEFAULT_WORKSPACE = PROJECT_ROOT / "data" / "route_research"
 
-STEPS: dict[str, tuple[str, list[str]]] = {
-    "boundary": ("sources/download_boundary.py", []),
-    "osm": ("sources/download_osm.py", []),
-    "landmarks": ("sources/download_landmarks.py", []),
-    "weather": ("sources/download_weather.py", []),
-    "pageviews": ("sources/download_pageviews.py", []),
-    "seed-coords": ("processing/seed_coordinates.py", []),
-    "normalize": ("processing/normalize.py", []),
-    "edge-features": ("processing/edge_features.py", []),
-    "event-context": ("processing/event_context.py", []),
-    "cause-targets": ("processing/cause_targets.py", []),
-}
+STEPS: dict[str, str] = dict(steps.RUNNERS)
 
 
 def initialise_workspace(target: Path) -> None:
@@ -33,16 +21,8 @@ def initialise_workspace(target: Path) -> None:
         dest = target / "seed" / source.name
         if not dest.exists():
             shutil.copy2(source, dest)
-    for d in [
-        "raw/boundary",
-        "raw/osm",
-        "raw/landmarks",
-        "raw/weather",
-        "raw/pageviews",
-        "raw/calendar",
-        "normalised",
-    ]:
-        (target / d).mkdir(parents=True, exist_ok=True)
+    for subdir in ("raw/boundary", "raw/osm", "raw/landmarks", "raw/weather", "normalised"):
+        (target / subdir).mkdir(parents=True, exist_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -56,19 +36,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.step == "status":
         print(f"Workspace: {args.workdir.resolve()}")
         print(f"Seed CSVs: {', '.join(sorted(p.name for p in (args.workdir / 'seed').glob('*.csv')))}")
-        print("Steps:", ", ".join(STEPS))
+        print("Steps:", ", ".join(STEPS.keys()))
         return 0
-    relative_path, prefix = STEPS[args.step]
-    env = os.environ.copy()
-    env["PYTHONPATH"] = os.pathsep.join(
-        [str(PROJECT_ROOT), env.get("PYTHONPATH", "")]
-    ).rstrip(os.pathsep)
-    return subprocess.run(
-        [sys.executable, str(HERE / relative_path), *prefix, *forwarded],
-        cwd=args.workdir,
-        env=env,
-        check=False,
-    ).returncode
+    context = steps.StepContext(args.workdir)
+    return steps.run_named_step(args.step, context, forwarded)
 
 
 if __name__ == "__main__":

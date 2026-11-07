@@ -12,6 +12,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - run: pip install -r requirements.txt
       - run: pip install -e ".[dev]"
-      - run: python -m ruff check src/ingestion/crawler
-      - run: python -m pytest tests/crawler -q
+      - run: python -m ruff check src/ingestion src/models src/database tests
+      - run: python -m pytest -q

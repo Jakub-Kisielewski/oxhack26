@@ -35,6 +35,41 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "W", "B", "SIM", "C90", "UP", "N", "RET", "ARG", "PTH", "TRY", "EM", "DTZ", "S", "I"]
 
+# Discipline B: tighten after phase-2 cleanup (see docs/phase2.md).
+[tool.ruff.lint.per-file-ignores]
+"src/ingestion/route_research/**" = [
+    "E501",
+    "TRY003",
+    "EM102",
+    "PTH123",
+    "DTZ011",
+    "SIM108",
+    "SIM105",
+    "PTH109",
+    "TRY300",
+    "C901",
+    "E402",
+]
+"tests/route_research/**" = ["E501", "DTZ001", "TRY003", "EM102", "ARG005", "F841"]
+"tests/**" = ["S101", "ARG001", "PLC0415"]
+"src/models/**" = [
+    "E501",
+    "E701",
+    "E702",
+    "N806",
+    "S101",
+    "B905",
+    "B007",
+    "PTH123",
+    "S301",
+    "TRY003",
+    "EM101",
+    "I001",
+    "UP017",
+]
+"src/database/**" = ["E501", "E701", "S608", "DTZ005"]
+"tests/crawler/**" = ["TRY003", "EM101"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
