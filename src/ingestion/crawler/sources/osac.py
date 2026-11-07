@@ -1,11 +1,19 @@
+"""US OSAC demonstration alert reports for London."""
+
 from __future__ import annotations
 
+import logging
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 from ingestion.crawler.client import HttpClient
+from ingestion.crawler.constants import (
+    DEFAULT_OSAC_LIMIT_REPORTS,
+    MIN_PARAGRAPH_CHARS_SHORT,
+    OSAC_MIN_INTERVAL_SEC,
+    RAW_EXCERPT_DEFAULT_CHARS,
+)
 from ingestion.crawler.models import ProtestRecord
 from ingestion.crawler.parse_utils import (
     clean_html_text,
@@ -13,6 +21,9 @@ from ingestion.crawler.parse_utils import (
     parse_participant_estimate,
     parse_route_streets,
 )
+from ingestion.crawler.sources.base import ProtestSource
+
+logger = logging.getLogger(__name__)
 
 BASE = "https://www.osac.gov"
 LISTING_URL = (
@@ -21,15 +32,35 @@ LISTING_URL = (
 )
 
 
-class OsacCrawler:
-    source_name = "osac"
+class OsacSource(ProtestSource):
+    """Embassy demonstration alerts published by OSAC."""
 
-    def __init__(self, client: Optional[HttpClient] = None):
-        self.client = client or HttpClient(min_interval_sec=0.5)
+    platform_id = "osac"
+    platform_name = "US OSAC (Embassy Demonstration Alerts)"
+    platform_url = BASE
 
-    def list_reports(self, london_only: bool = True) -> list[dict]:
+    def __init__(
+        self,
+        client: HttpClient | None = None,
+        *,
+        limit: int = DEFAULT_OSAC_LIMIT_REPORTS,
+        london_only: bool = True,
+    ) -> None:
+        super().__init__(client or HttpClient(min_interval_sec=OSAC_MIN_INTERVAL_SEC))
+        self.limit = limit
+        self.london_only = london_only
+
+    def fetch_records(self) -> list[ProtestRecord]:
+        fetched_at = datetime.now(UTC).isoformat()
+        records: list[ProtestRecord] = []
+        for report in self.list_reports()[: self.limit]:
+            html = self.client.get_text(report["url"], referer=LISTING_URL)
+            records.extend(self._parse_report(html, report, fetched_at))
+        return records
+
+    def list_reports(self) -> list[dict[str, str]]:
         html = self.client.get_text(LISTING_URL, referer=BASE)
-        reports: list[dict] = []
+        reports: list[dict[str, str]] = []
         for match in re.finditer(
             r'(?is)<div class="card-wrapper">\s*<a href="(?P<href>/Content/Report/[^"]+)"[^>]*>'
             r".*?<p class=\"card-text\">\s*(?P<meta>.*?)\s*</p>\s*"
@@ -37,7 +68,7 @@ class OsacCrawler:
             html,
         ):
             title = clean_html_text(match.group("title"))
-            if london_only and "london" not in title.lower():
+            if self.london_only and "london" not in title.lower():
                 continue
             if "demonstration alert" not in title.lower():
                 continue
@@ -51,22 +82,12 @@ class OsacCrawler:
             )
         return reports
 
-    def fetch_records(
-        self, limit: Optional[int] = 15, london_only: bool = True
-    ) -> list[ProtestRecord]:
-        fetched_at = datetime.now(timezone.utc).isoformat()
-        records: list[ProtestRecord] = []
-        for report in self.list_reports(london_only=london_only)[: limit or None]:
-            html = self.client.get_text(report["url"], referer=LISTING_URL)
-            records.extend(self._parse_report(html, report, fetched_at))
-        return records
-
     def _parse_report(
-        self, html: str, report: dict, fetched_at: str
+        self, html: str, report: dict[str, str], fetched_at: str
     ) -> list[ProtestRecord]:
         title = report["title"]
         source_id = report["url"].rstrip("/").split("/")[-1]
-        paragraphs = extract_paragraphs(html, min_len=10)
+        paragraphs = extract_paragraphs(html, min_len=MIN_PARAGRAPH_CHARS_SHORT)
         body = "\n".join(paragraphs)
 
         demo_blocks = self._extract_demo_blocks(paragraphs)
@@ -83,7 +104,7 @@ class OsacCrawler:
 
             records.append(
                 ProtestRecord(
-                    source=self.source_name,
+                    source=self.platform_id,
                     source_id=f"{source_id}:{idx}",
                     title=title,
                     url=report["url"],
@@ -97,7 +118,7 @@ class OsacCrawler:
                     estimated_participants_max=pmax,
                     estimated_participants_text=ptext,
                     location_label=self._field(block, "location"),
-                    raw_excerpt=block[:1500],
+                    raw_excerpt=block[:RAW_EXCERPT_DEFAULT_CHARS],
                     extra={
                         "demonstration_name": self._field(block, "demonstration"),
                         "listing_meta": report.get("listing_meta"),
@@ -116,16 +137,22 @@ class OsacCrawler:
                 blocks.append(clean_html_text(paragraph))
         return blocks
 
-    def _field(self, text: str, label: str) -> Optional[str]:
-        pattern = rf"{re.escape(label)}\s*:?\s*(.+?)(?=\s*(?:Date|Demonstration|Time|Route|Location|Number of participants)\s*:|$)"
+    def _field(self, text: str, label: str) -> str | None:
+        pattern = (
+            rf"{re.escape(label)}\s*:?\s*(.+?)"
+            r"(?=\s*(?:Date|Demonstration|Time|Route|Location|Number of participants)\s*:|$)"
+        )
         match = re.search(pattern, text, re.I | re.S)
         if not match:
             return None
         return clean_html_text(match.group(1))
 
-    def _compose_datetime(self, block: str) -> Optional[str]:
+    def _compose_datetime(self, block: str) -> str | None:
         date_val = self._field(block, "date")
         time_val = self._field(block, "time")
         if date_val and time_val:
             return f"{date_val} {time_val}"
         return date_val or time_val
+
+
+OsacCrawler = OsacSource

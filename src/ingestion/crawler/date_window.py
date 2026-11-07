@@ -1,16 +1,17 @@
+"""Event date parsing and sliding-window filters for ingestion records."""
+
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
 
 from ingestion.crawler.models import ProtestRecord
 
 DATE_POST_RE = re.compile(r"/(20\d{2})/(\d{2})/(\d{2})/")
 
-_HUMAN_DATE_RE = re.compile(
-    r"(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(20\d{2})",
+_MONTH_NAME_RE = re.compile(
+    r"(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(20\d{2})",
     re.I,
 )
 
@@ -30,7 +31,21 @@ _MONTH = {
 }
 
 
-def parse_event_datetime_str(value: Optional[str]) -> Optional[datetime]:
+def _parse_human_date(text: str) -> datetime | None:
+    """Parse '14 June 2026' or '14 Jun 2026' as a UTC midnight datetime."""
+    match = _MONTH_NAME_RE.search(text)
+    if not match:
+        return None
+    day, month_name, year = match.groups()
+    month = _MONTH[month_name.lower()[:3]]
+    try:
+        return datetime(int(year), month, int(day), tzinfo=UTC)
+    except ValueError:
+        return None
+
+
+def parse_event_datetime_str(value: str | None) -> datetime | None:
+    """Parse ISO or human-readable event datetimes to UTC."""
     if not value:
         return None
     text = value.strip()
@@ -41,54 +56,28 @@ def parse_event_datetime_str(value: Optional[str]) -> Optional[datetime]:
     try:
         dt = datetime.fromisoformat(iso)
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
     except ValueError:
         pass
 
-    match = _HUMAN_DATE_RE.search(text)
-    if match:
-        month_key = match.group(2).lower()[:3]
-        month = _MONTH.get(month_key)
-        if month:
-            return datetime(
-                int(match.group(3)),
-                month,
-                int(match.group(1)),
-                tzinfo=timezone.utc,
-            )
-
-    dmy = re.search(
-        r"(?i)(\d{1,2})\s+"
-        r"(January|February|March|April|May|June|July|August|September|October|November|December)"
-        r"\s+(20\d{2})",
-        text,
-    )
-    if dmy:
-        month_key = dmy.group(2).lower()[:3]
-        month = _MONTH.get(month_key)
-        if month:
-            return datetime(
-                int(dmy.group(3)),
-                month,
-                int(dmy.group(1)),
-                tzinfo=timezone.utc,
-            )
-    return None
+    return _parse_human_date(text)
 
 
-def event_date_from_url(url: str) -> Optional[datetime]:
+def event_date_from_url(url: str) -> datetime | None:
+    """Infer event date from a /YYYY/MM/DD/ path segment when present."""
     match = DATE_POST_RE.search(urlparse(url).path)
     if not match:
         return None
     year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
     try:
-        return datetime(year, month, day, tzinfo=timezone.utc)
+        return datetime(year, month, day, tzinfo=UTC)
     except ValueError:
         return None
 
 
-def record_event_datetime(record: ProtestRecord) -> Optional[datetime]:
+def record_event_datetime(record: ProtestRecord) -> datetime | None:
+    """Best-effort event datetime for a record."""
     parsed = parse_event_datetime_str(record.event_start)
     if parsed:
         return parsed
@@ -97,11 +86,12 @@ def record_event_datetime(record: ProtestRecord) -> Optional[datetime]:
 
 def window_bounds(
     *,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
     days_back: int,
     days_ahead: int = 0,
 ) -> tuple[datetime, datetime]:
-    anchor = now or datetime.now(timezone.utc)
+    """Inclusive UTC window anchored on ``now``."""
+    anchor = now or datetime.now(UTC)
     start = anchor - timedelta(days=days_back)
     end = anchor + timedelta(days=days_ahead)
     return start, end
@@ -110,17 +100,16 @@ def window_bounds(
 def is_within_event_window(
     event_dt: datetime,
     *,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
     days_back: int,
     days_ahead: int = 0,
 ) -> bool:
-    anchor = now or datetime.now(timezone.utc)
-    window_start, window_end = window_bounds(
-        now=anchor, days_back=days_back, days_ahead=days_ahead
-    )
+    """Whether ``event_dt`` falls inside the configured window."""
+    anchor = now or datetime.now(UTC)
+    window_start, window_end = window_bounds(now=anchor, days_back=days_back, days_ahead=days_ahead)
     if event_dt.tzinfo is None:
-        event_dt = event_dt.replace(tzinfo=timezone.utc)
-    event_dt = event_dt.astimezone(timezone.utc)
+        event_dt = event_dt.replace(tzinfo=UTC)
+    event_dt = event_dt.astimezone(UTC)
     return window_start <= event_dt <= window_end
 
 
@@ -129,8 +118,9 @@ def filter_records_by_event_window(
     *,
     days_back: int,
     days_ahead: int = 0,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> list[ProtestRecord]:
+    """Drop records outside the event window when bounds are positive."""
     if days_back <= 0 and days_ahead <= 0:
         return records
     kept: list[ProtestRecord] = []
@@ -138,8 +128,6 @@ def filter_records_by_event_window(
         event_dt = record_event_datetime(record)
         if event_dt is None:
             continue
-        if is_within_event_window(
-            event_dt, now=now, days_back=days_back, days_ahead=days_ahead
-        ):
+        if is_within_event_window(event_dt, now=now, days_back=days_back, days_ahead=days_ahead):
             kept.append(record)
     return kept

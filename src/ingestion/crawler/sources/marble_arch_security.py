@@ -1,12 +1,17 @@
+"""Marble Arch London BID security updates listing."""
+
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from ingestion.crawler.client import HttpClient
 from ingestion.crawler.models import ProtestRecord
+from ingestion.crawler.sources.base import ProtestSource
+
+logger = logging.getLogger(__name__)
 from ingestion.crawler.parse_utils import (
     clean_html_text,
     parse_counter_protest_flag,
@@ -78,7 +83,7 @@ _ROUTE_RE = re.compile(
 )
 
 
-def _estimate_from_marble_text(text: str) -> tuple[Optional[int], Optional[int], Optional[str]]:
+def _estimate_from_marble_text(text: str) -> tuple[int | None, int | None, str | None]:
     c_style = re.search(r"\bc\.?\s*([\d,]+)", text, re.I)
     if c_style:
         val = int(c_style.group(1).replace(",", ""))
@@ -120,15 +125,13 @@ def _is_protest_entry(title: str, body: str) -> bool:
         return True
 
     # Avoid keeping generic "march" / "vigil" / "event" police notices.
-    if has_primary_protest_language(title, body) and _TITLE_PROTEST.search(
-        f"{title} {body[:200]}"
-    ):
+    if has_primary_protest_language(title, body) and _TITLE_PROTEST.search(f"{title} {body[:200]}"):
         return True
 
     return False
 
 
-def _parse_route(body: str) -> Optional[str]:
+def _parse_route(body: str) -> str | None:
     match = _ROUTE_RE.search(body)
     if match:
         return clean_html_text(match.group(1))
@@ -144,14 +147,19 @@ def _source_id(title: str, body: str) -> str:
     return f"{slug}:{digest}"
 
 
-class MarbleArchSecurityCrawler:
-    source_name = "marble_arch_security"
+class MarbleArchSecuritySource(ProtestSource):
+    """Security update feed from Marble Arch London BID."""
 
-    def __init__(self, client: Optional[HttpClient] = None):
-        self.client = client or HttpClient(min_interval_sec=0.4)
+    platform_id = "marble_arch_security"
+    platform_name = "Marble Arch London (Security Updates)"
+    platform_url = LISTING_URL
 
-    def fetch_records(self, limit: Optional[int] = None) -> list[ProtestRecord]:
-        fetched_at = datetime.now(timezone.utc).isoformat()
+    def __init__(self, client: HttpClient | None = None, *, limit: int | None = None) -> None:
+        super().__init__(client or HttpClient(min_interval_sec=0.4))
+        self.limit = limit
+
+    def fetch_records(self) -> list[ProtestRecord]:
+        fetched_at = datetime.now(UTC).isoformat()
         html = self.client.get_text(LISTING_URL, referer=BASE)
         page_updated = self._page_last_updated(html)
         raw_entries = self._parse_future_items(html) + self._parse_update_blocks(html)
@@ -172,7 +180,7 @@ class MarbleArchSecurityCrawler:
             route_text = _parse_route(body)
             records.append(
                 ProtestRecord(
-                    source=self.source_name,
+                    source=self.platform_id,
                     source_id=sid,
                     title=title,
                     url=LISTING_URL,
@@ -194,11 +202,11 @@ class MarbleArchSecurityCrawler:
                     },
                 )
             )
-            if limit and len(records) >= limit:
+            if self.limit and len(records) >= self.limit:
                 break
         return records
 
-    def _page_last_updated(self, html: str) -> Optional[str]:
+    def _page_last_updated(self, html: str) -> str | None:
         match = re.search(
             r"Last updated\s+(\d{1,2}\s+\w+\s+20\d{2})",
             clean_html_text(html),
@@ -236,7 +244,7 @@ class MarbleArchSecurityCrawler:
             entries.append((title, body))
         return entries
 
-    def _location_hint(self, title: str, body: str) -> Optional[str]:
+    def _location_hint(self, title: str, body: str) -> str | None:
         for text in (title, body):
             loc = re.search(
                 r"(?i)(Marble Arch|Hyde Park|Park Lane|Oxford Street|Whitehall|"
@@ -247,3 +255,6 @@ class MarbleArchSecurityCrawler:
             if loc:
                 return loc.group(1)
         return None
+
+
+MarbleArchSecurityCrawler = MarbleArchSecuritySource

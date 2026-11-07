@@ -1,29 +1,29 @@
+"""Orchestrates protest source fetches and run artefacts under ``data/runs/``."""
+
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-import duckdb
 import pandas as pd
 
-from ingestion.crawler.models import ProtestRecord
+from ingestion.crawler.models import PROTEST_RECORD_COLUMNS
 from ingestion.crawler.platforms import PLATFORM_CATALOG, platform_meta, record_export_dict
-from ingestion.crawler.sources import (
-    MarbleArchSecurityCrawler,
-    MetPoliceCrawler,
-    OsacCrawler,
-    TflRoadDisruptionCrawler,
-)
-from ingestion.crawler.sources.organizers import ORGANIZER_SITES, OrganizerSiteCrawler
+from ingestion.crawler.run_summary import RunSummary
+from ingestion.crawler.sources.base import ProtestSource
+from ingestion.crawler.sources.registry import default_sources
+
+logger = logging.getLogger(__name__)
 
 
 class ProtestIngestionPipeline:
     """Writes each run under data/runs/{run_id}/{platform_id}/records.json."""
 
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path) -> None:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.runs_dir = output_dir / "runs"
@@ -31,18 +31,20 @@ class ProtestIngestionPipeline:
 
     def run(
         self,
+        sources: list[ProtestSource] | None = None,
         *,
+        run_id: str | None = None,
+        platforms: list[str] | None = None,
+        on_platform_complete: Callable[[str, dict[str, Any]], None] | None = None,
+        organizer_event_days_back: int = 0,
+        organizer_event_days_ahead: int = 0,
         met_limit: int = 8,
         osac_limit: int = 12,
         tfl_days_ahead: int = 30,
-        marble_arch_limit: Optional[int] = None,
-        organizer_event_days_back: int = 0,
-        organizer_event_days_ahead: int = 0,
-        platforms: Optional[list[str]] = None,
-        run_id: Optional[str] = None,
-        on_platform_complete: Optional[Callable[[str, dict[str, Any]], None]] = None,
-    ) -> dict[str, Any]:
-        run_id = run_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        marble_arch_limit: int | None = None,
+    ) -> RunSummary:
+        """Fetch each source sequentially and persist progress after every platform."""
+        run_id = run_id or datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         run_dir = self.runs_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -55,111 +57,74 @@ class ProtestIngestionPipeline:
         )
 
         met_media_dir = run_dir / "met_police" / "media"
-        crawlers = self._build_crawlers(
-            met_media_dir=met_media_dir,
-            met_limit=met_limit,
-            osac_limit=osac_limit,
-            tfl_days_ahead=tfl_days_ahead,
-            marble_arch_limit=marble_arch_limit,
-            organizer_event_days_back=organizer_event_days_back,
-            organizer_event_days_ahead=organizer_event_days_ahead,
-        )
+        if sources is None:
+            sources = default_sources(
+                met_media_dir=met_media_dir,
+                met_limit=met_limit,
+                osac_limit=osac_limit,
+                tfl_days_ahead=tfl_days_ahead,
+                marble_arch_limit=marble_arch_limit,
+                organizer_event_days_back=organizer_event_days_back,
+                organizer_event_days_ahead=organizer_event_days_ahead,
+            )
+        selected = self._resolve_platforms(platforms, sources)
+        platform_paths: dict[str, str] = dict(summary.outputs.get("platform_folders", {}))
 
-        selected = self._resolve_platforms(platforms, crawlers)
-        platform_paths: dict[str, str] = dict(
-            summary.get("outputs", {}).get("platform_folders", {})
-        )
-
-        for platform_id in selected:
+        for source in selected:
+            platform_id = source.platform_id
             platform_dir = run_dir / platform_id
             platform_dir.mkdir(parents=True, exist_ok=True)
             records_path = platform_dir / "records.json"
-            fetch_fn = crawlers[platform_id]
 
             try:
-                records = fetch_fn()
+                records = source.fetch_records()
                 self._write_platform_records(records_path, run_id, platform_id, records)
-                platform_paths[platform_id] = str(
-                    records_path.relative_to(self.output_dir)
-                )
+                platform_paths[platform_id] = str(records_path.relative_to(self.output_dir))
                 platform_result = {
                     **platform_meta(platform_id),
                     "status": "ok",
                     "records": len(records),
                     "records_path": platform_paths[platform_id],
-                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                    "finished_at": datetime.now(UTC).isoformat(),
                 }
-                summary["platforms"][platform_id] = platform_result
-            except Exception as exc:  # noqa: BLE001 - test pipeline should continue
+                summary.platforms[platform_id] = platform_result
+            except Exception as exc:  # noqa: BLE001 - one source must not abort the run
+                logger.exception("platform %s failed", platform_id)
                 platform_result = {
                     **platform_meta(platform_id),
                     "status": "error",
                     "error": str(exc),
                     "records_path": str(records_path.relative_to(self.output_dir)),
-                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                    "finished_at": datetime.now(UTC).isoformat(),
                 }
-                summary["platforms"][platform_id] = platform_result
-                summary["errors"].append({"platform_id": platform_id, "error": str(exc)})
+                summary.platforms[platform_id] = platform_result
+                summary.errors.append({"platform_id": platform_id, "error": str(exc)})
 
             self._rebuild_aggregate(run_dir)
-            summary["outputs"] = self._build_outputs(
-                run_dir, run_id, platform_paths, met_media_dir
-            )
-            summary["updated_at"] = datetime.now(timezone.utc).isoformat()
-            self._write_json(summary_path, summary)
+            summary.outputs = self._build_outputs(run_dir, run_id, platform_paths, met_media_dir)
+            summary.updated_at = datetime.now(UTC).isoformat()
+            self._write_json(summary_path, summary.to_dict())
 
             if on_platform_complete:
                 on_platform_complete(platform_id, platform_result)
 
-        summary["finished_at"] = datetime.now(timezone.utc).isoformat()
-        self._write_json(summary_path, summary)
+        summary.finished_at = datetime.now(UTC).isoformat()
+        self._write_json(summary_path, summary.to_dict())
         return summary
-
-    def _build_crawlers(
-        self,
-        *,
-        met_media_dir: Path,
-        met_limit: int,
-        osac_limit: int,
-        tfl_days_ahead: int,
-        marble_arch_limit: Optional[int],
-        organizer_event_days_back: int,
-        organizer_event_days_ahead: int,
-    ) -> dict[str, Callable[[], list[ProtestRecord]]]:
-        crawlers: dict[str, Callable[[], list[ProtestRecord]]] = {
-            "met_police": lambda: MetPoliceCrawler(media_dir=met_media_dir).fetch_records(
-                limit=met_limit
-            ),
-            "osac": lambda: OsacCrawler().fetch_records(limit=osac_limit),
-            "tfl_road_disruption": lambda: TflRoadDisruptionCrawler().fetch_records(
-                days_ahead=tfl_days_ahead
-            ),
-            "marble_arch_security": lambda: MarbleArchSecurityCrawler().fetch_records(
-                limit=marble_arch_limit
-            ),
-        }
-        for site in ORGANIZER_SITES:
-            crawlers[site.platform_id] = (
-                lambda s=site: OrganizerSiteCrawler(
-                    s,
-                    event_days_back=organizer_event_days_back,
-                    event_days_ahead=organizer_event_days_ahead,
-                ).fetch_records()
-            )
-        return crawlers
 
     def _resolve_platforms(
         self,
-        platforms: Optional[list[str]],
-        crawlers: dict[str, Callable[[], list[ProtestRecord]]],
-    ) -> list[str]:
+        platforms: list[str] | None,
+        sources: list[ProtestSource],
+    ) -> list[ProtestSource]:
+        by_id = {source.platform_id: source for source in sources}
         if not platforms:
-            return list(crawlers.keys())
-        unknown = [p for p in platforms if p not in crawlers]
+            return sources
+        unknown = [p for p in platforms if p not in by_id]
         if unknown:
-            known = ", ".join(sorted(crawlers.keys()))
+            known = ", ".join(sorted(by_id.keys()))
             raise ValueError(f"Unknown platform(s): {', '.join(unknown)}. Known: {known}")
-        return platforms
+        return [by_id[p] for p in platforms]
 
     def _load_or_init_summary(
         self,
@@ -168,20 +133,17 @@ class ProtestIngestionPipeline:
         run_id: str,
         organizer_event_days_back: int,
         organizer_event_days_ahead: int,
-    ) -> dict[str, Any]:
+    ) -> RunSummary:
         if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
-        return {
-            "run_id": run_id,
-            "started_at": datetime.now(timezone.utc).isoformat(),
-            "organizer_event_window": {
+            return RunSummary.from_dict(json.loads(path.read_text(encoding="utf-8")))
+        return RunSummary(
+            run_id=run_id,
+            started_at=datetime.now(UTC).isoformat(),
+            organizer_event_window={
                 "days_back": organizer_event_days_back,
                 "days_ahead": organizer_event_days_ahead,
             },
-            "platforms": {},
-            "errors": [],
-            "outputs": {},
-        }
+        )
 
     def _rebuild_aggregate(self, run_dir: Path) -> None:
         records = self._read_all_platform_records(run_dir)
@@ -189,7 +151,7 @@ class ProtestIngestionPipeline:
         flat_path.parent.mkdir(parents=True, exist_ok=True)
         flat_path.write_text(json.dumps(records, indent=2), encoding="utf-8")
         parquet_path = run_dir / "_all" / "protests.parquet"
-        self._write_parquet_from_dicts(parquet_path, records)
+        self._write_parquet(parquet_path, records)
 
     def _read_all_platform_records(self, run_dir: Path) -> list[dict[str, Any]]:
         merged: list[dict[str, Any]] = []
@@ -241,7 +203,7 @@ class ProtestIngestionPipeline:
         path: Path,
         run_id: str,
         platform_id: str,
-        records: list[ProtestRecord],
+        records: list,
     ) -> None:
         payload = {
             "run_id": run_id,
@@ -254,12 +216,14 @@ class ProtestIngestionPipeline:
     def _write_json(self, path: Path, payload: dict[str, Any]) -> None:
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
-    def _write_parquet_from_dicts(self, path: Path, records: list[dict[str, Any]]) -> None:
-        if not records:
-            path.write_bytes(b"")
-            return
-        frame = pd.DataFrame(records)
-        conn = duckdb.connect(database=":memory:")
-        conn.register("protests_df", frame)
-        conn.execute(f"COPY protests_df TO '{path.as_posix()}' (FORMAT PARQUET)")
-        conn.close()
+    def _write_parquet(self, path: Path, records: list[dict[str, Any]]) -> None:
+        """Write records to Parquet, including a valid empty file when there are none."""
+        normalised: list[dict[str, Any]] = []
+        for row in records:
+            copy = dict(row)
+            extra = copy.get("extra")
+            if isinstance(extra, dict):
+                copy["extra"] = json.dumps(extra) if extra else "{}"
+            normalised.append(copy)
+        frame = pd.DataFrame(normalised, columns=list(PROTEST_RECORD_COLUMNS))
+        frame.to_parquet(path, index=False)

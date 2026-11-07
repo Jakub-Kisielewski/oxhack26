@@ -1,22 +1,25 @@
+"""Organiser website event listing crawler."""
+
 from __future__ import annotations
 
+import logging
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 
 from ingestion.crawler.client import HttpClient
 from ingestion.crawler.date_window import (
+    DATE_POST_RE,
     event_date_from_url,
     is_within_event_window,
     parse_event_datetime_str,
 )
 from ingestion.crawler.models import ProtestRecord
 from ingestion.crawler.parse_utils import parse_route_streets
+from ingestion.crawler.sources.base import ProtestSource
 from ingestion.crawler.sources.organizers.filters import (
     ACTIONNETWORK_EVENT_RE,
     AN_EVENT_QUERY_RE,
-    DATE_POST_RE,
     EVENT_SLUG_SKIP,
     event_slug_pattern,
     is_london_protest_event,
@@ -30,6 +33,8 @@ from ingestion.crawler.sources.organizers.parse_event_page import (
     parse_route_hint,
 )
 from ingestion.crawler.sources.organizers.sites import OrganizerSiteConfig
+
+logger = logging.getLogger(__name__)
 
 _LISTING_SLUG_SKIP = frozenset(
     {
@@ -52,17 +57,22 @@ def _strip_www(host: str) -> str:
     return host.lower().removeprefix("www.")
 
 
-class OrganizerSiteCrawler:
+class OrganizerSiteSource(ProtestSource):
+    """Crawl a single organiser site's event listings."""
+
     def __init__(
         self,
         config: OrganizerSiteConfig,
-        client: Optional[HttpClient] = None,
+        client: HttpClient | None = None,
         *,
-        event_days_back: Optional[int] = None,
+        event_days_back: int | None = None,
         event_days_ahead: int = 0,
-    ):
+    ) -> None:
+        super().__init__(client or HttpClient(min_interval_sec=0.45))
         self.config = config
-        self.client = client or HttpClient(min_interval_sec=0.45)
+        self.platform_id = config.platform_id
+        self.platform_name = config.platform_name
+        self.platform_url = config.platform_url
         self._site_host = _strip_www(urlparse(config.platform_url).netloc)
         self.event_days_back = event_days_back
         self.event_days_ahead = event_days_ahead
@@ -71,13 +81,14 @@ class OrganizerSiteCrawler:
         self._event_listing_paths = frozenset({listing, "/events/", "/event/"})
 
     def fetch_records(self) -> list[ProtestRecord]:
-        fetched_at = datetime.now(timezone.utc).isoformat()
+        fetched_at = datetime.now(UTC).isoformat()
         self._warm_session()
         listing_html: list[str] = []
         for seed in self.config.seed_urls:
             try:
                 listing_html.append(self.client.get_text(seed, referer=self.config.platform_url))
-            except Exception:
+            except Exception as exc:
+                logger.debug("could not fetch listing %s: %s", seed, exc)
                 continue
             listing_html.extend(self._paginate(seed))
 
@@ -96,8 +107,8 @@ class OrganizerSiteCrawler:
                 self.config.platform_url.rstrip("/") + "/",
                 referer=None,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("session warm-up failed for %s: %s", self.config.platform_id, exc)
 
     def _paginate(self, seed: str) -> list[str]:
         if self.config.pagination == "none":
@@ -111,13 +122,9 @@ class OrganizerSiteCrawler:
             if self.config.pagination == "query_pno":
                 qs = parse_qs(parsed.query, keep_blank_values=True)
                 qs["pno"] = [str(page_no)]
-                page_urls.append(
-                    urlunparse(parsed._replace(query=urlencode(qs, doseq=True)))
-                )
+                page_urls.append(urlunparse(parsed._replace(query=urlencode(qs, doseq=True))))
             elif self.config.pagination == "path_page":
-                page_urls.append(
-                    urljoin(seed, f"{base_path.rstrip('/')}/page/{page_no}/")
-                )
+                page_urls.append(urljoin(seed, f"{base_path.rstrip('/')}/page/{page_no}/"))
 
             for page_url in page_urls:
                 try:
@@ -219,10 +226,7 @@ class OrganizerSiteCrawler:
                 if slug and slug.group(1).lower() not in EVENT_SLUG_SKIP:
                     return True
             if self.config.include_date_posts and DATE_POST_RE.search(path):
-                if any(
-                    skip in path
-                    for skip in ("/category/", "/tag/", "/author/", "/page/")
-                ):
+                if any(skip in path for skip in ("/category/", "/tag/", "/author/", "/page/")):
                     return False
                 return True
             if self._is_slug_post_url(path):
@@ -270,7 +274,7 @@ class OrganizerSiteCrawler:
         slug = lowered.strip("/")
         return len(slug) >= 20
 
-    def _fetch_detail(self, url: str, fetched_at: str) -> Optional[ProtestRecord]:
+    def _fetch_detail(self, url: str, fetched_at: str) -> ProtestRecord | None:
         try:
             html = self.client.get_text(url, referer=self.config.platform_url)
         except Exception:
@@ -318,7 +322,7 @@ class OrganizerSiteCrawler:
             extra=extra,
         )
 
-    def _event_in_window(self, event_start: Optional[str], url: str) -> bool:
+    def _event_in_window(self, event_start: str | None, url: str) -> bool:
         if self.event_days_back is None and self.event_days_ahead <= 0:
             return True
         days_back = self.event_days_back or 0
@@ -333,3 +337,6 @@ class OrganizerSiteCrawler:
             days_back=days_back,
             days_ahead=self.event_days_ahead,
         )
+
+
+OrganizerSiteCrawler = OrganizerSiteSource

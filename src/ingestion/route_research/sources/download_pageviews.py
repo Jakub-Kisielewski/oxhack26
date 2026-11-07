@@ -19,7 +19,9 @@ from urllib.parse import quote
 
 import requests
 
-API = 'https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/{article}/daily/{start}/{end}'
+from src.config import WIKIMEDIA_PAGEVIEWS_API
+
+API = WIKIMEDIA_PAGEVIEWS_API
 USER_AGENT = 'OxfordHack2026-protest-predictor/0.1 (https://github.com/Jakub-Kisielewski/oxhack26)'
 LOOKBACK_DAYS = 120
 

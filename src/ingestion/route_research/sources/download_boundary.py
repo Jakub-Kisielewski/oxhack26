@@ -21,7 +21,9 @@ import requests
 import shapely
 from shapely.geometry import MultiPoint
 
-BASE = 'https://api.tfl.gov.uk'
+from src.config import BOUNDARY_BUFFER_M, BOUNDARY_HULL_RATIO, TFL_API_BASE
+
+BASE = TFL_API_BASE
 MODES = 'tube,dlr,overground,elizabeth-line'
 STATION_TYPES = {'NaptanMetroStation', 'NaptanRailStation'}
 FIELDS = ['naptan_id', 'name', 'lat', 'lon', 'zone', 'modes']
@@ -82,8 +84,8 @@ def build_polygon(rows, buffer_m, ratio):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--outdir', default='raw/boundary')
-    p.add_argument('--buffer-m', type=float, default=300, help='Buffer around the hull in metres')
-    p.add_argument('--ratio', type=float, default=0.3, help='shapely concave_hull ratio (1 = convex hull)')
+    p.add_argument('--buffer-m', type=float, default=BOUNDARY_BUFFER_M, help='Buffer around the hull in metres')
+    p.add_argument('--ratio', type=float, default=BOUNDARY_HULL_RATIO, help='shapely concave_hull ratio (1 = convex hull)')
     a = p.parse_args()
     out = Path(a.outdir); out.mkdir(parents=True, exist_ok=True)
     params = {}

@@ -13,6 +13,7 @@ from src.contract import mapdata
 from src.contract.types import BacktestResult,BacktestRow
 from src.models.graph import MarchGraph
 from src.models.labels import TrainingEvent,history_counts
+from src.config import BACKTEST_FOLD_MAXITER
 from src.models.route_model import ChoiceModel,fit
 from src.models.destinations import candidates
 
@@ -53,7 +54,7 @@ def evaluate(g:MarchGraph,events:list[TrainingEvent],max_events:int|None=None)->
         training=[e for e in events if e.event_id!=event.event_id]
         hist=history_counts(training)
         def targets(cause):return mapdata.cause_targets(cause)
-        model=fit(g,training,targets_for=targets,maxiter=55)
+        model=fit(g,training,targets_for=targets,maxiter=BACKTEST_FOLD_MAXITER)
         dests=candidates(event.cause,training)
         chosen_end=dests[0].lonlat if dests else event.destination
         start=g.segments[event.route[0]].path[0]

@@ -1,1 +1,1 @@
-"""Ingestion layer entrypoints live under ``ingestion.crawler``."""
+"""Route research ingestion under ``src.ingestion.route_research``."""

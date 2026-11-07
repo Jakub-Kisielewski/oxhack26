@@ -28,6 +28,8 @@ import networkx as nx
 import osmnx as ox
 import pandas as pd
 
+from src.config import EDGE_BETWEENNESS_SAMPLES, EDGE_BETWEENNESS_SEED, LEGAL_ZONES_PATH
+
 PACKAGE_SEED = Path(__file__).resolve().parents[1] / 'seed'
 LANE_M, PAVEMENTS_M = 3.25, 5.0  # two 2.5 m pavements
 SAFE_DENSITY = 2.0  # people per m2
@@ -124,7 +126,7 @@ def zone_flags(edges, zones_path, open_spaces_path):
 
 def build(walk, main, zones_path, open_spaces_path, k):
     t0 = time.monotonic()
-    walk_scores, g_walk = betweenness(walk, k=k)
+    walk_scores, g_walk = betweenness(walk, k=k, seed=EDGE_BETWEENNESS_SEED)
     print(f'walk betweenness ({k} samples): {time.monotonic() - t0:.0f}s')
     main_scores = betweenness(main)[0] if main is not None else {}
     main_ids = set(main.edges(keys=True)) if main is not None else set()
@@ -152,9 +154,9 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--walk', default='raw/osm/london_walk.graphml')
     p.add_argument('--main', default='raw/osm/london_main.graphml')
-    p.add_argument('--legal-zones', default=str(PACKAGE_SEED / 'legal_zones.geojson'))
+    p.add_argument('--legal-zones', default=str(LEGAL_ZONES_PATH))
     p.add_argument('--open-spaces', default='raw/landmarks/open_spaces.geoparquet')
-    p.add_argument('--samples', type=int, default=150, help='Source nodes sampled for walk-network betweenness')
+    p.add_argument('--samples', type=int, default=EDGE_BETWEENNESS_SAMPLES, help='Source nodes sampled for walk-network betweenness')
     p.add_argument('--output', default='normalised/edge_features.csv')
     a = p.parse_args()
     walk = ox.load_graphml(a.walk)

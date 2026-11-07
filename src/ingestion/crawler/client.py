@@ -1,12 +1,24 @@
+"""HTTP client with polite throttling, retries, and optional curl SSL fallback."""
+
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import subprocess
 import time
-from typing import Any, Optional
+from typing import Any
+from urllib.parse import urlparse
+from urllib.robotparser import RobotFileParser
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+from ingestion.crawler.constants import DEFAULT_HTTP_TIMEOUT_SECONDS, DEFAULT_MIN_INTERVAL_SEC
+from ingestion.crawler.exceptions import CurlNotAvailableError
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_HEADERS = {
     "User-Agent": (
@@ -25,27 +37,68 @@ DEFAULT_HEADERS = {
     "Upgrade-Insecure-Requests": "1",
 }
 
+RETRY_POLICY = Retry(
+    total=3,
+    backoff_factor=0.5,
+    status_forcelist=(429, 500, 502, 503, 504),
+    allowed_methods=frozenset({"GET"}),
+    respect_retry_after_header=True,
+)
+
 
 class HttpClient:
+    """Session-based HTTP access for crawlers."""
+
     def __init__(
         self,
-        timeout: int = 30,
-        min_interval_sec: float = 0.35,
+        timeout: int = DEFAULT_HTTP_TIMEOUT_SECONDS,
+        min_interval_sec: float = DEFAULT_MIN_INTERVAL_SEC,
         *,
         cloudflare_fallback: bool = True,
-    ):
+        respect_robots: bool = True,
+    ) -> None:
         self.session = requests.Session()
         self.session.headers.update(DEFAULT_HEADERS)
+        adapter = HTTPAdapter(max_retries=RETRY_POLICY)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
         self.timeout = timeout
         self.min_interval_sec = min_interval_sec
         self.cloudflare_fallback = cloudflare_fallback
+        self.respect_robots = respect_robots
         self._last_request_at = 0.0
         self._cloudscraper: Any = None
+        self._robot_cache: dict[str, RobotFileParser | None] = {}
 
     def _throttle(self) -> None:
+        """Sleep so consecutive requests are at least min_interval_sec apart."""
         elapsed = time.monotonic() - self._last_request_at
         if elapsed < self.min_interval_sec:
             time.sleep(self.min_interval_sec - elapsed)
+        self._last_request_at = time.monotonic()
+
+    def _robots_allowed(self, url: str) -> bool:
+        if not self.respect_robots:
+            return True
+        parsed = urlparse(url)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        if origin not in self._robot_cache:
+            parser = RobotFileParser()
+            robots_url = f"{origin}/robots.txt"
+            parser.set_url(robots_url)
+            try:
+                parser.read()
+                self._robot_cache[origin] = parser
+            except Exception as exc:
+                logger.debug("could not read robots.txt for %s: %s", origin, exc)
+                self._robot_cache[origin] = None
+        parser = self._robot_cache[origin]
+        if parser is None:
+            return True
+        allowed = parser.can_fetch(DEFAULT_HEADERS["User-Agent"], url)
+        if not allowed:
+            logger.info("robots.txt disallows GET %s", url)
+        return allowed
 
     def _cloudscraper_session(self) -> Any:
         if self._cloudscraper is None:
@@ -64,8 +117,8 @@ class HttpClient:
         self,
         url: str,
         *,
-        params: Optional[dict] = None,
-        headers: Optional[dict] = None,
+        params: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> requests.Response:
         response = self.session.get(
             url,
@@ -100,7 +153,7 @@ class HttpClient:
     def _get_text_via_curl(self, url: str) -> str:
         curl = shutil.which("curl")
         if not curl:
-            raise requests.RequestException("curl not found for SSL fallback")
+            raise CurlNotAvailableError()
         # Some hosts (e.g. marble-arch.london) block the Chrome UA but accept a simple one.
         curl_user_agent = "Mozilla/5.0"
         proc = subprocess.run(
@@ -130,11 +183,14 @@ class HttpClient:
         self,
         url: str,
         *,
-        params: Optional[dict] = None,
-        referer: Optional[str] = None,
-        extra_headers: Optional[dict] = None,
+        params: dict[str, str] | None = None,
+        referer: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> str:
+        if not self._robots_allowed(url):
+            raise requests.RequestException(f"robots.txt disallows fetch: {url}")
         self._throttle()
+        logger.debug("GET %s", url)
         headers: dict[str, str] = {}
         if referer:
             headers["Referer"] = referer
@@ -147,8 +203,8 @@ class HttpClient:
                 params=params,
                 headers=headers or None,
             )
-            self._last_request_at = time.monotonic()
             if response.status_code == 403:
+                logger.info("403 from %s, retrying via curl fallback", url)
                 return self._get_text_via_curl(url)
             response.raise_for_status()
             text = response.text
@@ -156,28 +212,35 @@ class HttpClient:
                 return self._get_text_via_curl(url)
             return text
         except requests.exceptions.SSLError:
-            self._last_request_at = time.monotonic()
+            logger.info("SSL error for %s, retrying via curl fallback", url)
             return self._get_text_via_curl(url)
 
     def get_json(
         self,
         url: str,
         *,
-        params: Optional[dict] = None,
-    ) -> object:
+        params: dict[str, str] | None = None,
+    ) -> list[Any] | dict[str, Any]:
+        if not self._robots_allowed(url):
+            raise requests.RequestException(f"robots.txt disallows fetch: {url}")
         self._throttle()
+        logger.debug("GET JSON %s", url)
         response = self._request_get(url, params=params)
-        self._last_request_at = time.monotonic()
         response.raise_for_status()
-        return response.json()
+        payload = response.json()
+        if isinstance(payload, (list, dict)):
+            return payload
+        raise requests.RequestException(f"unexpected JSON type from {url}")
 
     def get_bytes(
         self,
         url: str,
         *,
-        referer: Optional[str] = None,
-        extra_headers: Optional[dict] = None,
-    ) -> tuple[bytes, Optional[str]]:
+        referer: str | None = None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> tuple[bytes, str | None]:
+        if not self._robots_allowed(url):
+            raise requests.RequestException(f"robots.txt disallows fetch: {url}")
         self._throttle()
         headers: dict[str, str] = {}
         if referer:
@@ -185,7 +248,6 @@ class HttpClient:
         if extra_headers:
             headers.update(extra_headers)
         response = self._request_get(url, headers=headers or None)
-        self._last_request_at = time.monotonic()
         response.raise_for_status()
         return response.content, response.headers.get("Content-Type")
 

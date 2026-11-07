@@ -1,15 +1,7 @@
-"""Run protest ingestion: ``python -m src.ingestion`` from repo root."""
+"""Run protest ingestion: ``python -m ingestion`` after ``pip install -e .``."""
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from ingestion.crawler.cli import main
 
-_SRC = Path(__file__).resolve().parents[1]
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
-
-from ingestion.crawler.cli import _ensure_project_python, main
-
-_ensure_project_python()
-main()
+raise SystemExit(main())

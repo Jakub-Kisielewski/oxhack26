@@ -4,9 +4,8 @@ from collections import Counter
 from dataclasses import dataclass
 from src.contract import mapdata
 from src.models.features import dark_fraction
+from src.config import DEFAULT_TURNOUT, INTERPOLATED_WEIGHT, WAYPOINT_LABEL_RADIUS_M
 from src.models.graph import MarchGraph
-
-INTERPOLATED_WEIGHT=0.3
 
 @dataclass
 class TrainingEvent:
@@ -34,9 +33,13 @@ def read_events(g:MarchGraph, interpolated_weight:float=INTERPOLATED_WEIGHT)->li
         weights=[]
         for sid in route:
             seg=g.segments[sid]
-            weights.append(1.0 if min(mapdata.distance_m(seg.mid,p) for p in pts)<=150 else interpolated_weight)
+            weights.append(
+                1.0
+                if min(mapdata.distance_m(seg.mid, p) for p in pts) <= WAYPOINT_LABEL_RADIUS_M
+                else interpolated_weight
+            )
         output.append(TrainingEvent(e.event_id,e.date,e.cause,
-                      {'turnout': e.turnout or 10000,'precip_mm_4h':rains.get(e.event_id,0),
+                      {'turnout': e.turnout or DEFAULT_TURNOUT,'precip_mm_4h':rains.get(e.event_id,0),
                        'dark_fraction':darks.get(e.event_id,0)},
                       pts[-1],route,weights,str(e.waypoints[-1][0] or '').strip()))
     return output

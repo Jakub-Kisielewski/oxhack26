@@ -5,8 +5,8 @@ from dataclasses import dataclass,field
 from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize
-from scipy.special import logsumexp,softmax
-from scipy.sparse import csr_matrix
+from scipy.special import softmax
+from src.config import LOGIT_MAXITER, LOGIT_REG
 from src.models.features import NAMES,feature_vector
 from src.models.labels import TrainingEvent,history_counts
 from src.models.graph import MarchGraph
@@ -49,19 +49,9 @@ class ChoiceModel:
         x=(X-np.asarray(self.mean))/np.maximum(np.asarray(self.std),1e-6)
         return softmax(np.clip(x@np.asarray(self.theta),-100,100))
 
-    def transition_matrix(self,g:MarchGraph, ids:list[str],context:dict,destination:tuple[float,float],
-                          history:dict|None=None,targets:list|None=None) -> csr_matrix:
-        index={sid:i for i,sid in enumerate(ids)}
-        rows=[];cols=[];values=[]
-        for a in ids:
-            candidates=[b for b in g.next_ids(a) if b in index]
-            for b,p in zip(candidates,self.probs(g,a,candidates,destination,context,history,targets)):
-                rows.append(index[a]);cols.append(index[b]);values.append(float(p))
-        return csr_matrix((values,(rows,cols)),shape=(len(ids),len(ids)))
-
 
 def fit(g:MarchGraph,events:list[TrainingEvent],targets_for=None,
-        reg:float=2.0,maxiter:int=90) -> ChoiceModel:
+        reg:float=LOGIT_REG,maxiter:int=LOGIT_MAXITER) -> ChoiceModel:
     history=history_counts(events)
     arrays=[];indices=[];weights=[]; n_events=0
     for event in events:

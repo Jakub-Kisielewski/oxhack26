@@ -1,41 +1,50 @@
+"""Platform metadata for ingestion outputs."""
+
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Final, TypedDict
 
+from ingestion.crawler.models import ProtestRecord
+from ingestion.crawler.sources.marble_arch_security import MarbleArchSecuritySource
+from ingestion.crawler.sources.met_police import MetPoliceSource
 from ingestion.crawler.sources.organizers.sites import ORGANIZER_SITES
-
-PLATFORM_CATALOG: dict[str, dict[str, str]] = {
-    "met_police": {
-        "platform_id": "met_police",
-        "platform_name": "Met Police Newsroom",
-        "platform_url": "https://news.met.police.uk",
-    },
-    "osac": {
-        "platform_id": "osac",
-        "platform_name": "US OSAC (Embassy Demonstration Alerts)",
-        "platform_url": "https://www.osac.gov",
-    },
-    "tfl_road_disruption": {
-        "platform_id": "tfl_road_disruption",
-        "platform_name": "TfL Unified API (Road Disruptions)",
-        "platform_url": "https://api.tfl.gov.uk",
-    },
-    "marble_arch_security": {
-        "platform_id": "marble_arch_security",
-        "platform_name": "Marble Arch London (Security Updates)",
-        "platform_url": "https://marble-arch.london/security-updates/",
-    },
-}
-
-for _site in ORGANIZER_SITES:
-    PLATFORM_CATALOG[_site.platform_id] = {
-        "platform_id": _site.platform_id,
-        "platform_name": _site.platform_name,
-        "platform_url": _site.platform_url,
-    }
+from ingestion.crawler.sources.osac import OsacSource
+from ingestion.crawler.sources.tfl import TflRoadDisruptionSource
 
 
-def platform_meta(platform_id: str) -> dict[str, str]:
+class PlatformMeta(TypedDict):
+    platform_id: str
+    platform_name: str
+    platform_url: str
+
+
+def build_platform_catalog() -> dict[str, PlatformMeta]:
+    """Static metadata for every platform this project ingests."""
+    catalog: dict[str, PlatformMeta] = {}
+    for stub in (
+        MetPoliceSource,
+        OsacSource,
+        TflRoadDisruptionSource,
+        MarbleArchSecuritySource,
+    ):
+        catalog[stub.platform_id] = {
+            "platform_id": stub.platform_id,
+            "platform_name": stub.platform_name,
+            "platform_url": stub.platform_url,
+        }
+    for site in ORGANIZER_SITES:
+        catalog[site.platform_id] = {
+            "platform_id": site.platform_id,
+            "platform_name": site.platform_name,
+            "platform_url": site.platform_url,
+        }
+    return catalog
+
+
+PLATFORM_CATALOG: Final = build_platform_catalog()
+
+
+def platform_meta(platform_id: str) -> PlatformMeta:
     return PLATFORM_CATALOG.get(
         platform_id,
         {
@@ -46,12 +55,8 @@ def platform_meta(platform_id: str) -> dict[str, str]:
     )
 
 
-def record_export_dict(record: Any) -> dict[str, Any]:
-    if hasattr(record, "to_dict"):
-        data = record.to_dict()
-    elif hasattr(record, "model_dump"):
-        data = record.model_dump()
-    else:
-        data = dict(record)
+def record_export_dict(record: ProtestRecord) -> dict[str, Any]:
+    """Serialise a record plus platform metadata for JSON export."""
+    data = record.to_dict()
     data.update(platform_meta(data.get("source", "")))
     return data

@@ -1,40 +1,25 @@
-# --- Frontend & UI ---
+# Visualisation
 streamlit>=1.40
-pydeck>=0.8.0
-folium>=0.17
-streamlit-folium>=0.22
+altair>=5.0
+pandas>=2.2.2
 
-# --- Data Storage & Spatial Engine ---
+# Data storage & spatial
 duckdb==1.5.5
-# Spatial extension bundled for pip (no manual download). No Intel-Mac wheel: install it manually there (see README).
 duckdb-extension-spatial==1.5.5; sys_platform != "darwin" or platform_machine != "x86_64"
 pyarrow>=15.0.0
 geopandas>=1.0
 shapely>=2.0.6
 
-# --- Mathematical Modeling (Spatial & Temporal) ---
-tick>=0.8
-libpysal>=4.10
-esda>=2.5.1
-scikit-learn>=1.5
+# Modelling
 numpy>=2.0
 scipy>=1.11
-pandas>=2.2.2
-
-# --- Data Ingestion & APIs ---
-requests>=2.31.0
-cloudscraper>=1.2.71
-protobuf>=4.25.3
-gtfs-realtime-bindings>=0.0.7
-
-
-
-
-osmnx>=2.0,<3
 networkx>=3.2,<4
+
+# Ingestion
+requests>=2.31.0
+osmnx>=2.0,<3
 geopy>=2.4,<3
 openpyxl>=3.1,<4
 astral>=3.2
 hijridate>=2.5
-# OPTIONAL: for 09_sample_ghsl.py, install rasterio separately:
-# rasterio>=1.3,<2
+pyproj>=3.6

@@ -26,8 +26,7 @@ import pandas as pd
 from osmnx._errors import InsufficientResponseError
 
 METRIC_CRS = 'EPSG:27700'
-OVERPASS_URLS = ['https://overpass-api.de/api', 'https://overpass.private.coffee/api',
-                 'https://overpass.kumi.systems/api']
+from src.config import OVERPASS_URLS
 BACKOFF_S = [0, 30, 60, 120]  # wait before each round over all servers
 
 LAYERS = {

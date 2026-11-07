@@ -1,3 +1,5 @@
+"""Heuristics for keeping London protest events from organiser listing pages."""
+
 from __future__ import annotations
 
 import re
@@ -131,45 +133,43 @@ def looks_like_non_protest_meeting(text: str) -> bool:
     return any(term in padded for term in NON_PROTEST_MEETING)
 
 
+def _mentions_other_uk_city(haystack: str) -> bool:
+    """True when a non-London UK city is named and no London location is.
+
+    A page naming both (e.g. a national march with a London feeder) is treated
+    as London, because the London leg is what this project models.
+    """
+    names_london = any(term in haystack for term in LONDON_TERMS)
+    names_elsewhere = any(city in haystack for city in UK_NON_LONDON)
+    return names_elsewhere and not names_london
+
+
 def is_london_protest_event(*, title: str, body: str, url: str) -> bool:
-    combined = f"{title} {body} {url}"
-    lowered = combined.lower()
+    """True when an organiser event page describes a protest action in London."""
+    haystack = f"{title} {body} {url}".lower()
 
-    if not mentions_london(lowered):
+    if not mentions_london(haystack):
         return False
-
-    body_lower = body.lower()
-    title_lower = title.lower()
-    url_lower = url.lower()
-    for city in UK_NON_LONDON:
-        if city not in lowered:
-            continue
-        if "london" in lowered or "westminster" in lowered:
-            continue
-        if city in title_lower or city in url_lower or city in body_lower:
-            return False
-
-    if not has_primary_protest_language(title, body):
+    if _mentions_other_uk_city(haystack):
         return False
-
-    if looks_like_non_protest_meeting(lowered) and not has_primary_protest_language(
-        title, body
+    if not has_primary_protest_language(title=title, body=body):
+        return False
+    if looks_like_non_protest_meeting(haystack) and not has_primary_protest_language(
+        title=title, body=""
     ):
         return False
-
     return True
 
 
-EVENT_SLUG_SKIP: frozenset[str] = frozenset(
-    {"list", "category", "tags", "tag", "page", "feed"}
-)
+EVENT_SLUG_SKIP: frozenset[str] = frozenset({"list", "category", "tags", "tag", "page", "feed"})
 EVENT_SLUG_RE = re.compile(r"/events/([a-z0-9][a-z0-9-]{2,})/?", re.I)
 
 
 def event_slug_pattern(prefix: str) -> re.Pattern[str]:
     segment = prefix.strip("/")
     return re.compile(rf"/{re.escape(segment)}/([a-z0-9][a-z0-9-]{{2,}})/?", re.I)
-DATE_POST_RE = re.compile(r"/(20\d{2})/(\d{2})/(\d{2})/", re.I)
+
+
 ACTIONNETWORK_EVENT_RE = re.compile(
     r"actionnetwork\.org/(?:events|ticketed_events)/([a-z0-9_-]+)",
     re.I,

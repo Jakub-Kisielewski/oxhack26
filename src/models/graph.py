@@ -16,12 +16,9 @@ import networkx as nx
 import numpy as np
 from scipy.spatial import cKDTree
 
+from src.config import GRAPH_PATH
 from src.contract import mapdata
 from src.contract.types import LonLat
-
-ROOT = Path(__file__).resolve().parents[2]
-ARTIFACTS = ROOT / 'data' / 'models'
-GRAPH_PATH = ARTIFACTS / 'graph.pkl'
 ALLOWED = {'trunk','primary','secondary','tertiary','trunk_link','primary_link',
            'secondary_link','tertiary_link','unclassified','residential',
            'living_street','pedestrian'}

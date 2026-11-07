@@ -18,9 +18,11 @@ from pathlib import Path
 
 import requests
 
-LAT, LON = 51.5074, -0.1278  # Trafalgar Square; zones 1-2 fit in one ~10 km model cell
-ARCHIVE_URL = 'https://archive-api.open-meteo.com/v1/archive'
-FORECAST_URL = 'https://api.open-meteo.com/v1/forecast'
+from src.config import LONDON_LAT, LONDON_LON, OPEN_METEO_ARCHIVE, OPEN_METEO_FORECAST
+
+LAT, LON = LONDON_LAT, LONDON_LON
+ARCHIVE_URL = OPEN_METEO_ARCHIVE
+FORECAST_URL = OPEN_METEO_FORECAST
 ARCHIVE_LAG_DAYS = 6
 FORECAST_MAX_AHEAD = 16
 FORECAST_MAX_PAST = 92

@@ -3,11 +3,11 @@ from __future__ import annotations
 import math
 import numpy as np
 from src.contract import mapdata
+from src.config import MARCH_HOURS
 from src.models.graph import MarchGraph, angle
 
 NAMES=('progress','log_width','turnout_x_width','is_main','log_betweenness',
        'turn','target_pull','royal_park','restricted','history','rain_x_main','dark_x_main')
-MARCH_HOURS=4
 
 
 def dark_fraction(daylight_after_start_h)->float:

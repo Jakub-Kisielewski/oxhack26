@@ -1,10 +1,12 @@
+"""Parse organiser event detail pages into protest record fields."""
+
 from __future__ import annotations
 
 import html
 import json
 import re
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import unquote
 
 from ingestion.crawler.parse_utils import clean_html_text, extract_paragraphs
@@ -48,9 +50,7 @@ _MONTH_NUM = {
 
 
 def parse_page_title(raw_html: str) -> str:
-    og = re.search(
-        r'property="og:title"\s+content="([^"]+)"', raw_html, re.I
-    )
+    og = re.search(r'property="og:title"\s+content="([^"]+)"', raw_html, re.I)
     if og:
         return _decode_entities(og.group(1))
     h1 = re.search(r"(?is)<h1[^>]*>(.*?)</h1>", raw_html)
@@ -67,8 +67,8 @@ def parse_page_title(raw_html: str) -> str:
 def parse_page_body(raw_html: str) -> str:
     for pattern in (
         r'(?is)<div[^>]+class="[^"]*entry-content[^"]*"[^>]*>(.*?)</div>',
-        r'(?is)<article[^>]*>(.*?)</article>',
-        r'(?is)<main[^>]*>(.*?)</main>',
+        r"(?is)<article[^>]*>(.*?)</article>",
+        r"(?is)<main[^>]*>(.*?)</main>",
     ):
         match = re.search(pattern, raw_html)
         if match:
@@ -78,11 +78,9 @@ def parse_page_body(raw_html: str) -> str:
     return "\n".join(extract_paragraphs(raw_html, min_len=40)[:12])
 
 
-def parse_event_datetime(raw_html: str, body: str) -> tuple[Optional[str], Optional[str]]:
+def parse_event_datetime(raw_html: str, body: str) -> tuple[str | None, str | None]:
     for blob in (raw_html, body):
-        iso = re.search(
-            r'<time[^>]+datetime="(\d{4}-\d{2}-\d{2}T[^"]+)"', blob, re.I
-        )
+        iso = re.search(r'<time[^>]+datetime="(\d{4}-\d{2}-\d{2}T[^"]+)"', blob, re.I)
         if iso:
             start = iso.group(1)
             end_match = re.search(
@@ -122,7 +120,7 @@ def parse_event_datetime(raw_html: str, body: str) -> tuple[Optional[str], Optio
     return None, None
 
 
-def parse_location_hint(raw_html: str, body: str) -> Optional[str]:
+def parse_location_hint(raw_html: str, body: str) -> str | None:
     for text in (body, clean_html_text(raw_html)):
         pin = re.search(r"📍\s*([^\n]{6,120})", text)
         if pin:
@@ -166,7 +164,7 @@ def parse_arrest_metadata(body: str) -> dict[str, object]:
     return out
 
 
-def parse_route_hint(body: str) -> Optional[str]:
+def parse_route_hint(body: str) -> str | None:
     route = re.search(
         r"(?im)(?:route|march route|assembly point)\s*:?\s*([^\n]{10,240})",
         body,
@@ -176,10 +174,8 @@ def parse_route_hint(body: str) -> Optional[str]:
     return None
 
 
-def _json_ld_events(raw_html: str) -> Optional[dict[str, Any]]:
-    for match in re.finditer(
-        r'<script type="application/ld\+json">(.*?)</script>', raw_html, re.S
-    ):
+def _json_ld_events(raw_html: str) -> dict[str, Any] | None:
+    for match in re.finditer(r'<script type="application/ld\+json">(.*?)</script>', raw_html, re.S):
         try:
             payload = json.loads(match.group(1))
         except json.JSONDecodeError:
@@ -190,7 +186,7 @@ def _json_ld_events(raw_html: str) -> Optional[dict[str, Any]]:
     return None
 
 
-def _find_event_node(payload: Any) -> Optional[dict[str, Any]]:
+def _find_event_node(payload: Any) -> dict[str, Any] | None:
     if isinstance(payload, list):
         for item in payload:
             found = _find_event_node(item)
@@ -211,7 +207,7 @@ def _decode_entities(value: str) -> str:
     return html.unescape(unquote(value.replace("&#039;", "'")))
 
 
-def _weekday_or_day_month_to_iso(match: re.Match[str]) -> Optional[str]:
+def _weekday_or_day_month_to_iso(match: re.Match[str]) -> str | None:
     day = int(match.group(1))
     month_key = match.group(2).lower()[:3]
     month_full = match.group(2).lower()
@@ -219,22 +215,22 @@ def _weekday_or_day_month_to_iso(match: re.Match[str]) -> Optional[str]:
     if not month:
         return None
     year_group = match.lastindex or 0
-    year: Optional[int] = None
+    year: int | None = None
     if year_group >= 3 and match.group(3):
         year = int(match.group(3))
     if year is None:
         year = _infer_event_year(month, day)
     try:
-        dt = datetime(year, month, day, tzinfo=timezone.utc)
+        dt = datetime(year, month, day, tzinfo=UTC)
     except ValueError:
         return None
     return dt.date().isoformat()
 
 
 def _infer_event_year(month: int, day: int) -> int:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     try:
-        candidate = datetime(now.year, month, day, tzinfo=timezone.utc)
+        candidate = datetime(now.year, month, day, tzinfo=UTC)
     except ValueError:
         return now.year
     if (now - candidate).days > 45:
