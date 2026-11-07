@@ -5,13 +5,15 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 LonLat = tuple[float, float]
-Path = list[LonLat]
+Polyline = list[LonLat]
+"""Ordered (lon, lat) vertices: a street segment or stitched march route."""
 
 
+@dataclass
 class _Serialisable:
-    """JSON-friendly ``dataclass`` mixin."""
+    """Base for read-only DTOs below; subclasses must stay dataclasses."""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return asdict(self)
 
 
@@ -36,7 +38,7 @@ class HistoricalEvent(_Serialisable):
     organiser: str | None
     turnout: int | None
     route_segment_ids: list[str]
-    path: Path
+    path: Polyline
     waypoints: list[tuple[str, LonLat]]
 
 

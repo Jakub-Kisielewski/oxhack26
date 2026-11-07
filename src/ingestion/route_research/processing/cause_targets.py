@@ -17,11 +17,11 @@ OUT:   normalised/cause_targets.csv
 
 import argparse
 import json
-import math
 from pathlib import Path
 
 import pandas as pd
 
+from src.database.mapdata import distance_m
 from src.ingestion.route_research.constants import PACKAGE_SEED
 from src.ingestion.route_research.context import StepContext
 from src.ingestion.route_research.runner import run_cli_step
@@ -29,13 +29,9 @@ from src.ingestion.route_research.runner import run_cli_step
 MAX_MATCH_M = 400
 
 
-def haversine_m(lat1, lon1, lat2, lon2):
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    a = (
-        math.sin((p2 - p1) / 2) ** 2
-        + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lon2 - lon1) / 2) ** 2
-    )
-    return 2 * 6371000 * math.asin(math.sqrt(a))
+def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Adapter for legacy (lat, lon) call sites; distances use ``mapdata.distance_m``."""
+    return distance_m((lon1, lat1), (lon2, lat2))
 
 
 def read_layer(path, columns):

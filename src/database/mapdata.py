@@ -1,7 +1,7 @@
 """Read-only base data for the model layer and backtest UI.
 
 Every function returns database types or plain dicts/lists with coordinates as
-(lon, lat). All runtime database access goes through `cursor()`, which shares one
+(lon, lat). All runtime database access goes through ``cursor()``, which shares one
 read-only connection per process (DuckDB refuses a second connection to the same
 file with a different configuration). PROTEST_DB (see src/database/db.py) selects the file.
 Results of the cached functions are shared: treat them as read-only.
@@ -11,13 +11,13 @@ from __future__ import annotations
 
 import json
 import math
-import re
+from datetime import date, datetime, time
 from functools import lru_cache
 
 import duckdb
 
 from src.database.db import DB_PATH, get_connection
-from src.database.types import CauseOption, HistoricalEvent, LonLat, Path
+from src.database.types import CauseOption, HistoricalEvent, LonLat, Polyline
 
 
 @lru_cache(maxsize=1)
@@ -31,18 +31,15 @@ def cursor() -> duckdb.DuckDBPyConnection:
     return connection().cursor()
 
 
-# ---------- geometry helpers ----------
-
-
 def _coords(geojson: str) -> list:
     return json.loads(geojson)["coordinates"]
 
 
-def _line(geojson: str) -> Path:
+def _line(geojson: str) -> Polyline:
     return [(float(x), float(y)) for x, y, *_ in _coords(geojson)]
 
 
-def _rings(geojson: str) -> list[Path]:
+def _rings(geojson: str) -> list[Polyline]:
     """Outer ring of each polygon in a Polygon/MultiPolygon."""
     g = json.loads(geojson)
     polys = (
@@ -56,7 +53,11 @@ def _rings(geojson: str) -> list[Path]:
 
 
 def distance_m(a: LonLat, b: LonLat) -> float:
-    """Haversine distance in metres between two (lon, lat) points."""
+    """Great-circle distance in metres on WGS84 (Haversine).
+
+    Both arguments are ``(longitude, latitude)`` in degrees. Used by the route
+    model for progress and target-pull features.
+    """
     lon1, lat1, lon2, lat2 = map(math.radians, (*a, *b))
     h = (
         math.sin((lat2 - lat1) / 2) ** 2
@@ -73,21 +74,43 @@ def _table_exists(name: str) -> bool:
     )
 
 
-def _first_int(text) -> int | None:
-    m = re.search(r"\d[\d,]*", str(text or ""))
-    return int(m.group().replace(",", "")) if m else None
+def _has_column(table: str, column: str) -> bool:
+    return bool(
+        cursor()
+        .execute(
+            "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
+            [table, column],
+        )
+        .fetchone()[0]
+    )
 
 
-def _hhmm(text) -> str | None:
-    m = re.match(r"^\s*(\d{1,2}):(\d{2})", str(text or ""))
-    return f"{int(m.group(1)):02d}:{m.group(2)}" if m else None
+def _format_date(value: date | datetime | str | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value)[:10]
+
+
+def _format_time(value: time | datetime | str | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, time):
+        return value.strftime("%H:%M")
+    if isinstance(value, datetime):
+        return value.time().strftime("%H:%M")
+    text = str(value).strip()
+    return text[:5] if len(text) >= 5 else text or None
 
 
 # ---------- reference data ----------
 
 
 @lru_cache(maxsize=1)
-def list_causes() -> list[CauseOption]:
+def list_causes() -> tuple[CauseOption, ...]:
     """Distinct protest causes with event counts for UI selectors."""
     counts = dict(
         cursor()
@@ -103,24 +126,27 @@ def list_causes() -> list[CauseOption]:
             .fetchall()
         ):
             counts.setdefault(cause, 0)
-    return sorted(
-        (
-            CauseOption(key=k, label=k.replace("_", " ").title(), n_events=int(n))
-            for k, n in counts.items()
-        ),
-        key=lambda c: (-c.n_events, c.key),
+    return tuple(
+        sorted(
+            (
+                CauseOption(key=k, label=k.replace("_", " ").title(), n_events=int(n))
+                for k, n in counts.items()
+            ),
+            key=lambda c: (-c.n_events, c.key),
+        )
     )
 
 
 @lru_cache(maxsize=2)
-def historical_events(protests_only: bool = True) -> list[HistoricalEvent]:
+def historical_events(protests_only: bool = True) -> tuple[HistoricalEvent, ...]:
     """Events with snapped routes and waypoints from DuckDB."""
     cur = cursor()
     events = cur.execute("""
-        SELECT e.event_id, e.event_name, CAST(e.event_date AS VARCHAR), CAST(e.start_time AS VARCHAR),
-               c.cause, e.organiser, CAST(e.turnout AS VARCHAR), e.event_category
-        FROM events e LEFT JOIN event_context c USING (event_id) ORDER BY e.event_date, e.event_id""").fetchall()
-    routes: dict[str, list[tuple[str, Path]]] = {}
+        SELECT e.event_id, e.event_name, e.event_date, e.start_time,
+               c.cause, e.organiser, e.turnout, e.event_category
+        FROM events e LEFT JOIN event_context c USING (event_id)
+        ORDER BY e.event_date, e.event_id""").fetchall()
+    routes: dict[str, list[tuple[str, Polyline]]] = {}
     for event_id, segment_id, geo in cur.execute("""
             SELECT r.event_id, r.segment_id, ST_AsGeoJSON(s.geom) FROM route_segments r
             JOIN segments s USING (segment_id) ORDER BY r.event_id, r.sequence_index""").fetchall():
@@ -130,76 +156,47 @@ def historical_events(protests_only: bool = True) -> list[HistoricalEvent]:
             SELECT event_id, waypoint_name, longitude, latitude FROM waypoints
             WHERE latitude IS NOT NULL ORDER BY event_id, sequence_index""").fetchall():
         waypoints.setdefault(event_id, []).append((name, (float(lon), float(lat))))
-    out = []
-    for event_id, name, date, start, cause, organiser, turnout, category in events:
+    out: list[HistoricalEvent] = []
+    for event_id, name, event_date, start, cause, organiser, turnout, category in events:
         segs = routes.get(event_id, [])
         if len(segs) < 2 or (protests_only and category != "protest"):
             continue
-        path: Path = []
+        path: Polyline = []
         for _, line in segs:
             path.extend(line[1:] if path and line and path[-1] == line[0] else line)
+        turnout_val = int(turnout) if turnout is not None else None
         out.append(
             HistoricalEvent(
                 event_id=event_id,
                 name=name,
-                date=str(date)[:10],
-                start_time=_hhmm(start),
+                date=_format_date(event_date),
+                start_time=_format_time(start),
                 cause=cause or None,
                 organiser=organiser or None,
-                turnout=_first_int(turnout),
+                turnout=turnout_val,
                 route_segment_ids=[s for s, _ in segs],
                 path=path,
                 waypoints=waypoints.get(event_id, []),
             )
         )
-    return out
-
-
-def segment_paths(ids: list[str]) -> dict[str, Path]:
-    """GeoJSON line coordinates keyed by ``segment_id``."""
-    if not ids:
-        return {}
-    rows = (
-        cursor()
-        .execute(
-            "SELECT segment_id, ST_AsGeoJSON(geom) FROM segments WHERE segment_id IN (SELECT UNNEST(?))",
-            [list(ids)],
-        )
-        .fetchall()
-    )
-    return {sid: _line(geo) for sid, geo in rows}
-
-
-def cells_for_segments(ids: list[str]) -> dict[str, int]:
-    """Midpoint hexagon of each segment."""
-    if not ids or not _table_exists("segment_cells"):
-        return {}
-    return dict(
-        cursor()
-        .execute(
-            """SELECT segment_id, cell_id FROM segment_cells
-                                    WHERE is_midpoint_cell AND segment_id IN (SELECT UNNEST(?))""",
-            [list(ids)],
-        )
-        .fetchall()
-    )
+    return tuple(out)
 
 
 @lru_cache(maxsize=1)
-def boundary() -> list[Path]:
+def boundary() -> tuple[Polyline, ...]:
     """TfL zones 1-2 boundary polygon rings."""
-    rings = []
+    rings: list[Polyline] = []
     for (geo,) in cursor().execute("SELECT ST_AsGeoJSON(geom) FROM boundary").fetchall():
         rings.extend(_rings(geo))
-    return rings
+    return tuple(rings)
 
 
 @lru_cache(maxsize=1)
-def legal_zones() -> list[dict]:
+def legal_zones() -> tuple[dict, ...]:
     """Legal restriction polygons with rule metadata."""
     if not _table_exists("legal_zones"):
-        return []
-    out = []
+        return ()
+    out: list[dict] = []
     for zone_id, name, rule, geo in (
         cursor()
         .execute("SELECT zone_id, name, rule_type, ST_AsGeoJSON(geom) FROM legal_zones")
@@ -207,14 +204,14 @@ def legal_zones() -> list[dict]:
     ):
         for ring in _rings(geo):
             out.append({"zone_id": zone_id, "name": name, "rule_type": rule, "polygon": ring})
-    return out
+    return tuple(out)
 
 
 def targets(categories: list[str] | None = None) -> list[dict]:
     """Embassy and landmark targets, optionally filtered by ``categories``."""
     country_sel = "country" if _has_column("targets", "country") else "NULL"
     sql = f"SELECT name, category, {country_sel}, lon, lat FROM targets WHERE lat IS NOT NULL"  # noqa: S608 — country_sel is country|NULL literal
-    params = []
+    params: list = []
     if categories:
         sql += " AND category IN (SELECT UNNEST(?))"
         params.append(list(categories))
@@ -247,124 +244,8 @@ def cause_targets(cause: str | None) -> list[dict]:
     ]
 
 
-def _has_column(table: str, column: str) -> bool:
-    return bool(
-        cursor()
-        .execute(
-            "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
-            [table, column],
-        )
-        .fetchone()[0]
-    )
-
-
-def _bbox_params(lonlat: LonLat, radius_m: float) -> list[float]:
-    dlat = radius_m / 111_320
-    dlon = radius_m / (111_320 * math.cos(math.radians(lonlat[1])))
-    return [lonlat[1] - dlat, lonlat[1] + dlat, lonlat[0] - dlon, lonlat[0] + dlon]
-
-
-def shops_near(lonlat: LonLat, radius_m: float = 300, limit: int = 50) -> list[dict]:
-    """OSM shops within ``radius_m`` of ``lonlat``, sorted by distance."""
-    rows = (
-        cursor()
-        .execute(
-            """
-        SELECT osm_id, name, shop, lon, lat, meters(geometry, ST_Point(?, ?)) AS d FROM shops
-        WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? AND d <= ? ORDER BY d LIMIT ?""",
-            [*lonlat, *_bbox_params(lonlat, radius_m), radius_m, limit],
-        )
-        .fetchall()
-    )
-    return [
-        {
-            "osm_id": o,
-            "name": n,
-            "shop": s,
-            "lonlat": (float(lon), float(lat)),
-            "distance_m": round(float(d), 1),
-        }
-        for o, n, s, lon, lat, d in rows
-    ]
-
-
-def search_shops(text: str, limit: int = 20) -> list[dict]:
-    """Substring search on shop names."""
-    rows = (
-        cursor()
-        .execute(
-            """SELECT osm_id, name, shop, lon, lat FROM shops WHERE name ILIKE ?
-                               ORDER BY length(name), name LIMIT ?""",
-            [f"%{text.strip()}%", limit],
-        )
-        .fetchall()
-    )
-    return [
-        {"osm_id": o, "name": n, "shop": s, "lonlat": (float(lon), float(lat))}
-        for o, n, s, lon, lat in rows
-    ]
-
-
 @lru_cache(maxsize=1)
-def warehouses() -> list[dict]:
-    """Storage/warehouse points from OSM (legacy decision-layer data)."""
-    fp = "footprint_m2" if _has_column("warehouses", "footprint_m2") else "NULL"
-    rows = (
-        cursor()
-        .execute(
-            f"SELECT osm_id, name, lon, lat, {fp} FROM warehouses WHERE lat IS NOT NULL"  # noqa: S608 — fp is footprint_m2|NULL literal
-        )
-        .fetchall()
-    )
-    return [
-        {
-            "osm_id": o,
-            "name": n,
-            "lonlat": (float(lon), float(lat)),
-            "footprint_m2": float(f) if f is not None else None,
-        }
-        for o, n, lon, lat, f in rows
-    ]
-
-
-def cells(ids: list[int] | None = None) -> list[dict]:
-    """Hex grid cells; all cells when ``ids`` is None."""
-    if ids is None:
-        return _all_cells()
-    wanted = set(ids)
-    return [c for c in _all_cells() if c["cell_id"] in wanted]
-
-
-@lru_cache(maxsize=1)
-def _all_cells() -> list[dict]:
-    rows = (
-        cursor()
-        .execute(
-            "SELECT cell_id, lon, lat, ST_AsGeoJSON(geometry) FROM grid_cells ORDER BY cell_id"
-        )
-        .fetchall()
-    )
-    return [
-        {"cell_id": int(i), "lonlat": (float(lon), float(lat)), "polygon": _rings(geo)[0]}
-        for i, lon, lat, geo in rows
-    ]
-
-
-def cell_at(lonlat: LonLat) -> int | None:
-    """Hex ``cell_id`` containing ``lonlat``, if the grid table exists."""
-    row = (
-        cursor()
-        .execute(
-            "SELECT cell_id FROM grid_cells WHERE ST_Contains(geometry, ST_Point(?, ?)) LIMIT 1",
-            list(lonlat),
-        )
-        .fetchone()
-    )
-    return int(row[0]) if row else None
-
-
-@lru_cache(maxsize=1)
-def assembly_points() -> list[dict]:
+def assembly_points() -> tuple[dict, ...]:
     """Frequent march start waypoint names averaged in lon/lat."""
     rows = (
         cursor()
@@ -372,15 +253,16 @@ def assembly_points() -> list[dict]:
         WITH firsts AS (
             SELECT w.waypoint_name, w.longitude, w.latitude FROM waypoints w
             JOIN (SELECT event_id, MIN(sequence_index) AS s FROM waypoints GROUP BY event_id) f
-              ON w.event_id = f.event_id AND w.sequence_index = f.s)
+              ON w.event_id = f.event_id AND w.sequence_index = f.s
+        )
         SELECT waypoint_name, AVG(longitude), AVG(latitude), COUNT(*) FROM firsts
         GROUP BY waypoint_name ORDER BY COUNT(*) DESC, waypoint_name""")
         .fetchall()
     )
-    return [
+    return tuple(
         {"name": n, "lonlat": (float(lon), float(lat)), "n_events": int(k)}
         for n, lon, lat, k in rows
-    ]
+    )
 
 
 def in_boundary(lonlat: LonLat) -> bool:
