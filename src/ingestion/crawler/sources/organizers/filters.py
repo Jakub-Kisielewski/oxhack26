@@ -123,9 +123,7 @@ def has_primary_protest_language(title: str, body: str) -> bool:
         if term in title_padded or term in body_padded:
             return True
     combined = f"{title} {body}".lower().replace("-", " ")
-    if "demo" in combined:
-        return True
-    return False
+    return "demo" in combined
 
 
 def looks_like_non_protest_meeting(text: str) -> bool:
@@ -154,11 +152,9 @@ def is_london_protest_event(*, title: str, body: str, url: str) -> bool:
         return False
     if not has_primary_protest_language(title=title, body=body):
         return False
-    if looks_like_non_protest_meeting(haystack) and not has_primary_protest_language(
-        title=title, body=""
-    ):
-        return False
-    return True
+    meeting = looks_like_non_protest_meeting(haystack)
+    title_only = has_primary_protest_language(title=title, body="")
+    return not (meeting and not title_only)
 
 
 EVENT_SLUG_SKIP: frozenset[str] = frozenset({"list", "category", "tags", "tag", "page", "feed"})

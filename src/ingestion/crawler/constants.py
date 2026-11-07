@@ -1,28 +1,19 @@
-"""Named tuning constants for crawler sources and the CLI."""
+"""Named tuning constants for discovery crawler and CLI."""
 
 from __future__ import annotations
 
-RAW_EXCERPT_MAX_CHARS = 2000
-RAW_EXCERPT_DEFAULT_CHARS = 1500
 SUPPRESSION_SCAN_CHARS = 800
 MAX_ARCHIVE_PAGES = 20
-MAX_SLUG_CHARS = 60
-HIGH_RES_IMAGE_WIDTH_PX = 2400
-MAX_STREETS_PER_RECORD = 6
 MIN_PARAGRAPH_CHARS = 25
-MIN_PARAGRAPH_CHARS_SHORT = 10
+MIN_PARAGRAPH_CHARS_SHORT = 15
 MIN_DIV_CHUNK_CHARS = 20
 
 DEFAULT_MET_LIMIT = 8
-DEFAULT_OSAC_LIMIT = 12
-DEFAULT_TFL_DAYS_AHEAD = 30
-DEFAULT_TFL_PAST_HOURS = 24
-DEFAULT_OSAC_LIMIT_REPORTS = 15
 
 DEFAULT_HTTP_TIMEOUT_SECONDS = 30
 DEFAULT_MIN_INTERVAL_SEC = 0.35
-TFL_MIN_INTERVAL_SEC = 0.2
-OSAC_MIN_INTERVAL_SEC = 0.5
 
-PROTEST_TERMS: tuple[str, ...] = ("demonstration", "march")
-EXCLUDED_EVENT_TERMS: tuple[str, ...] = ("remembrance",)
+DISCOVERY_USER_AGENT = (
+    "LondonProtestPredictor/0.1 (academic research; "
+    "contact via https://github.com/crislu05/london-protest-predictor)"
+)

@@ -84,7 +84,8 @@ def parse_participant_estimate(text: str) -> tuple[int | None, int | None, str |
         return low, high, range_dash.group(0)
 
     single = re.search(
-        r"(?:approximately|around|about|up to|expected)?\s*([\d,]+)\s*(?:people|participants|expected)?",
+        r"(?:approximately|around|about|up to|expected)?\s*([\d,]+)\s*"
+        r"(?:people|participants|expected)?",
         text,
         re.I,
     )
@@ -95,25 +96,13 @@ def parse_participant_estimate(text: str) -> tuple[int | None, int | None, str |
     return None, None, None
 
 
-def parse_route_streets(route_text: str) -> list[str]:
-    """Split a free-text route into street or segment labels."""
-    if not route_text:
-        return []
-    parts = re.split(r"\s*(?:>|,| and | onto | via | travelling via )\s*", route_text, flags=re.I)
-    streets: list[str] = []
-    for part in parts:
-        cleaned = part.strip(" .")
-        cleaned = re.sub(r"^(?:namely|route:?|location:?)\s*", "", cleaned, flags=re.I)
-        if cleaned and len(cleaned) > 2:
-            streets.append(cleaned)
-    return streets
-
-
-def parse_counter_protest_flag(text: str) -> bool | None:
-    """Detect whether copy mentions an expected counter-protest."""
-    lowered = text.lower()
-    if re.search(r"no counter[- ]protest", lowered):
-        return False
-    if "counter-protest" in lowered or "counter protest" in lowered:
-        return True
+def turnout_estimate_from_text(text: str) -> int | None:
+    """Collapse participant estimate phrases to one integer for the model context."""
+    low, high, _ = parse_participant_estimate(text)
+    if low is not None and high is not None:
+        return (low + high) // 2
+    if low is not None:
+        return low
+    if high is not None:
+        return high
     return None

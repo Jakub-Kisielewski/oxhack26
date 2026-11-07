@@ -15,7 +15,7 @@ from ingestion.crawler.date_window import (
     parse_event_datetime_str,
 )
 from ingestion.crawler.models import ProtestRecord
-from ingestion.crawler.parse_utils import parse_route_streets
+from ingestion.crawler.parse_utils import turnout_estimate_from_text
 from ingestion.crawler.sources.base import ProtestSource
 from ingestion.crawler.sources.organizers.filters import (
     ACTIONNETWORK_EVENT_RE,
@@ -25,7 +25,6 @@ from ingestion.crawler.sources.organizers.filters import (
     is_london_protest_event,
 )
 from ingestion.crawler.sources.organizers.parse_event_page import (
-    parse_arrest_metadata,
     parse_event_datetime,
     parse_location_hint,
     parse_page_body,
@@ -129,7 +128,8 @@ class OrganizerSiteSource(ProtestSource):
             for page_url in page_urls:
                 try:
                     html = self.client.get_text(page_url, referer=seed)
-                except Exception:
+                except Exception as exc:
+                    logger.debug("paginate skip %s: %s", page_url, exc)
                     continue
                 if (
                     self._event_slug_re.search(html)
@@ -173,9 +173,9 @@ class OrganizerSiteSource(ProtestSource):
         return ordered
 
     def _filter_urls_by_window(self, urls: list[str]) -> list[str]:
-        if self.event_days_back is None or self.event_days_back <= 0:
-            if self.event_days_ahead <= 0:
-                return urls
+        no_window = self.event_days_back is None or self.event_days_back <= 0
+        if no_window and self.event_days_ahead <= 0:
+            return urls
         filtered: list[str] = []
         for url in urls:
             url_date = event_date_from_url(url)
@@ -212,7 +212,7 @@ class OrganizerSiteSource(ProtestSource):
         host = _strip_www(host)
         return host == self._site_host or host.endswith(f".{self._site_host}")
 
-    def _is_candidate_url(self, url: str) -> bool:
+    def _is_candidate_url(self, url: str) -> bool:  # noqa: C901
         parsed = urlparse(url)
         host = parsed.netloc.lower()
         path = parsed.path.lower()
@@ -226,20 +226,18 @@ class OrganizerSiteSource(ProtestSource):
                 if slug and slug.group(1).lower() not in EVENT_SLUG_SKIP:
                     return True
             if self.config.include_date_posts and DATE_POST_RE.search(path):
-                if any(skip in path for skip in ("/category/", "/tag/", "/author/", "/page/")):
-                    return False
-                return True
+                skips = ("/category/", "/tag/", "/author/", "/page/")
+                return not any(skip in path for skip in skips)
             if self._is_slug_post_url(path):
                 return True
-            if self.config.include_listing_slugs and self._is_listing_article_slug(path):
-                return True
-            return False
+            return bool(self.config.include_listing_slugs and self._is_listing_article_slug(path))
 
-        if self.config.include_actionnetwork and "actionnetwork.org" in host:
-            if ACTIONNETWORK_EVENT_RE.search(url):
-                if "/fundraising/" in path or "/forms/" in path:
-                    return False
-                return True
+        if (
+            self.config.include_actionnetwork
+            and "actionnetwork.org" in host
+            and ACTIONNETWORK_EVENT_RE.search(url)
+        ):
+            return not ("/fundraising/" in path or "/forms/" in path)
         for extra in self.config.extra_domains:
             if extra in host and self._event_slug_re.search(path):
                 return True
@@ -287,7 +285,7 @@ class OrganizerSiteSource(ProtestSource):
         if not is_london_protest_event(title=title, body=body, url=url):
             return None
 
-        event_start, event_end = parse_event_datetime(html, body)
+        event_start, _event_end = parse_event_datetime(html, body)
         if not self._event_in_window(event_start, url):
             return None
 
@@ -298,13 +296,7 @@ class OrganizerSiteSource(ProtestSource):
         if parsed_query.get("an_event"):
             source_id = f"an_event:{parsed_query['an_event'][0]}"
 
-        extra: dict[str, object] = {
-            "organizer": self.config.platform_name,
-            "organizer_url": self.config.platform_url,
-        }
-        arrest_meta = parse_arrest_metadata(body)
-        if arrest_meta:
-            extra.update(arrest_meta)
+        turnout = turnout_estimate_from_text(body)
 
         return ProtestRecord(
             source=self.config.platform_id,
@@ -313,13 +305,9 @@ class OrganizerSiteSource(ProtestSource):
             url=url,
             fetched_at=fetched_at,
             event_start=event_start,
-            event_end=event_end,
             form_up_location=location,
             route_text=route_text,
-            route_streets=parse_route_streets(route_text or ""),
-            location_label=location or "London",
-            raw_excerpt=body[:1200],
-            extra=extra,
+            turnout_estimate=turnout,
         )
 
     def _event_in_window(self, event_start: str | None, url: str) -> bool:
@@ -337,6 +325,3 @@ class OrganizerSiteSource(ProtestSource):
             days_back=days_back,
             days_ahead=self.event_days_ahead,
         )
-
-
-OrganizerSiteCrawler = OrganizerSiteSource

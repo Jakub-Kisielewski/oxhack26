@@ -6,9 +6,8 @@ from ingestion.crawler.parse_utils import (
     clean_html_text,
     first_match_group,
     iter_json_ld,
-    parse_counter_protest_flag,
     parse_participant_estimate,
-    parse_route_streets,
+    turnout_estimate_from_text,
 )
 
 
@@ -21,15 +20,8 @@ def test_parse_participant_between() -> None:
     assert low == 1000 and high == 2000 and text
 
 
-def test_parse_route_streets_splits_on_via() -> None:
-    streets = parse_route_streets("Whitehall via Parliament Square")
-    assert "Whitehall" in streets[0]
-    assert any("Parliament" in s for s in streets)
-
-
-def test_counter_protest_flag() -> None:
-    assert parse_counter_protest_flag("no counter-protest expected") is False
-    assert parse_counter_protest_flag("counter-protest likely") is True
+def test_turnout_estimate_from_range() -> None:
+    assert turnout_estimate_from_text("between 1,000 and 3,000 people") == 2000
 
 
 def test_iter_json_ld_skips_malformed() -> None:

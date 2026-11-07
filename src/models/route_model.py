@@ -89,6 +89,14 @@ def fit(g:MarchGraph,events:list[TrainingEvent],targets_for=None,
 
     result=minimize(loss_grad,prior,method='L-BFGS-B',jac=True,
                     options={'maxiter':maxiter,'ftol':1e-7})
+    rain_support=sum(1 for e in events if float(e.context.get('precip_mm_4h') or 0)>0.5)
+    dark_support=sum(1 for e in events if float(e.context.get('dark_fraction') or 0)>0.05)
+    prior_only=[name for name,ok in (
+        ('rain_x_main',rain_support>=2),
+        ('dark_x_main',dark_support>=2),
+    ) if not ok]
     return ChoiceModel(result.x.tolist(),means.tolist(),std.tolist(),NAMES,True,
                        {'n_events':n_events,'n_choices':len(arrays),'weighted_choices':float(w.sum()),
-                        'loss':float(result.fun),'converged':bool(result.success)})
+                        'loss':float(result.fun),'converged':bool(result.success),
+                        'prior_only':prior_only,'rain_support_events':rain_support,
+                        'dark_support_events':dark_support})

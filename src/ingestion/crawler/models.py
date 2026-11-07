@@ -1,37 +1,39 @@
-"""Normalised protest record shared by every ingestion source."""
+"""Candidate march record emitted by the discovery crawler."""
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field, fields
+import csv
+from dataclasses import asdict, dataclass, fields
+from pathlib import Path
 from typing import Any
 
 
-@dataclass
+@dataclass(frozen=True)
 class ProtestRecord:
-    """Normalized protest signal from any Tier 1 source."""
+    """A candidate march discovered from a published source, pending geocode review."""
 
     source: str
     source_id: str
-    title: str
     url: str
+    title: str
     fetched_at: str
     event_start: str | None = None
-    event_end: str | None = None
     form_up_location: str | None = None
     route_text: str | None = None
-    route_streets: list[str] = field(default_factory=list)
-    estimated_participants_min: int | None = None
-    estimated_participants_max: int | None = None
-    estimated_participants_text: str | None = None
-    counter_protest_expected: bool | None = None
-    location_label: str | None = None
-    latitude: float | None = None
-    longitude: float | None = None
-    raw_excerpt: str = ""
-    extra: dict[str, Any] = field(default_factory=dict)
+    turnout_estimate: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-PROTEST_RECORD_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(ProtestRecord))
+CANDIDATE_CSV_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(ProtestRecord))
+
+
+def write_candidates_csv(path: Path, records: list[ProtestRecord]) -> None:
+    """Write discovery rows for human promotion into seed CSVs."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(CANDIDATE_CSV_COLUMNS))
+        writer.writeheader()
+        for record in records:
+            writer.writerow(record.to_dict())

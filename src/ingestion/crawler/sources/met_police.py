@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import html as html_lib
-import json
 import logging
 import re
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
@@ -16,23 +14,18 @@ import requests
 from ingestion.crawler.client import HttpClient
 from ingestion.crawler.constants import (
     DEFAULT_MET_LIMIT,
-    HIGH_RES_IMAGE_WIDTH_PX,
     MAX_ARCHIVE_PAGES,
-    MAX_SLUG_CHARS,
     MIN_DIV_CHUNK_CHARS,
     MIN_PARAGRAPH_CHARS,
-    RAW_EXCERPT_MAX_CHARS,
+    SUPPRESSION_SCAN_CHARS,
 )
-from ingestion.crawler.exceptions import MediaDirectoryNotConfiguredError
 from ingestion.crawler.models import ProtestRecord
 from ingestion.crawler.parse_utils import (
     clean_html_text,
     extract_paragraphs,
     first_match_group,
     iter_json_ld,
-    parse_counter_protest_flag,
-    parse_participant_estimate,
-    parse_route_streets,
+    turnout_estimate_from_text,
 )
 from ingestion.crawler.sources.base import ProtestSource
 
@@ -57,7 +50,6 @@ PROTEST_KEYWORDS = (
     "national march",
 )
 
-# Met posts about bans/suppressions are not upcoming actionable marches.
 SUPPRESSED_EVENT_PATTERNS = (
     r"consented to (?:the )?(?:(?:metropolitan|met)(?: police)? )?banning",
     r"\bbanning (?:\w+\s+){0,4}march",
@@ -77,20 +69,16 @@ class MetPoliceSource(ProtestSource):
     def __init__(
         self,
         client: HttpClient | None = None,
-        media_dir: Path | None = None,
-        download_images: bool = True,
         *,
         limit: int = DEFAULT_MET_LIMIT,
     ) -> None:
         super().__init__(client)
-        self.media_dir = media_dir
-        self.download_images = download_images
         self.limit = limit
 
     def list_articles(
         self, limit: int | None = None, max_pages: int = MAX_ARCHIVE_PAGES
     ) -> list[dict[str, Any]]:
-        articles: list[dict] = []
+        articles: list[dict[str, Any]] = []
         seen_urls: set[str] = set()
 
         page_html = self.client.get_text(CENTRAL_LONDON_TAG_URL)
@@ -122,9 +110,9 @@ class MetPoliceSource(ProtestSource):
     def _collect_candidates(
         self,
         page_html: str,
-        articles: list[dict],
+        articles: list[dict[str, Any]],
         seen_urls: set[str],
-        limit: Optional[int],
+        limit: int | None,
     ) -> None:
         for stub in self._extract_story_stubs(page_html):
             if stub["url"] in seen_urls:
@@ -140,17 +128,9 @@ class MetPoliceSource(ProtestSource):
             if limit is not None and len(articles) >= limit:
                 return
 
-    def _extract_story_stubs(self, page_html: str) -> list[dict]:
-        stubs: list[dict] = []
-        for match in re.finditer(
-            r'<script type="application/ld\+json">(.*?)</script>', page_html, re.S
-        ):
-            try:
-                payload = json.loads(match.group(1))
-            except json.JSONDecodeError:
-                continue
-            if payload.get("@type") != "CollectionPage":
-                continue
+    def _extract_story_stubs(self, page_html: str) -> list[dict[str, Any]]:
+        stubs: list[dict[str, Any]] = []
+        for payload in iter_json_ld(page_html, schema_type="CollectionPage"):
             for item in payload.get("mainEntity", []):
                 if item.get("@type") != "NewsArticle":
                     continue
@@ -195,7 +175,7 @@ class MetPoliceSource(ProtestSource):
             extra_headers={"X-Requested-With": "XMLHttpRequest"},
         )
 
-    def _extract_next_page_path(self, page_html: str) -> Optional[str]:
+    def _extract_next_page_path(self, page_html: str) -> str | None:
         match = re.search(
             r'infinite-pagination__item__next-button[^>]*href="([^"]+)"',
             page_html,
@@ -210,7 +190,7 @@ class MetPoliceSource(ProtestSource):
         return any(keyword in blob for keyword in PROTEST_KEYWORDS)
 
     def _is_suppressed_event(self, headline: str, description: str, body: str = "") -> bool:
-        blob = f"{headline} {description} {body[:800]}".lower()
+        blob = f"{headline} {description} {body[:SUPPRESSION_SCAN_CHARS]}".lower()
         return any(re.search(pattern, blob, re.I) for pattern in SUPPRESSED_EVENT_PATTERNS)
 
     def _normalize_article_url(self, url: str) -> str:
@@ -218,7 +198,7 @@ class MetPoliceSource(ProtestSource):
             return url
         return urljoin(BASE, url)
 
-    def _canonical_url(self, item: dict) -> str:
+    def _canonical_url(self, item: dict[str, Any]) -> str:
         for candidate in (item.get("url"), item.get("mainEntityOfPage")):
             if not candidate:
                 continue
@@ -229,7 +209,9 @@ class MetPoliceSource(ProtestSource):
                 return f"{BASE}/news/{slug_match.group(1)}"
         return self._normalize_article_url(item.get("url") or CENTRAL_LONDON_TAG_URL)
 
-    def _parse_article(self, html: str, article: dict, fetched_at: str) -> list[ProtestRecord]:
+    def _parse_article(
+        self, html: str, article: dict[str, Any], fetched_at: str
+    ) -> list[ProtestRecord]:
         body = self._extract_body_text(html)
         title = article["headline"]
         description = article.get("description", "")
@@ -240,11 +222,16 @@ class MetPoliceSource(ProtestSource):
 
         route_text = self._extract_section_12_route(body)
         form_up = self._extract_form_up(body)
-        participants = self._extract_participants(body)
-        counter = parse_counter_protest_flag(body)
-        event_start, event_end = self._extract_event_window(body, title)
+        event_start = self._extract_event_start(body, title)
+        turnout = None
+        match = re.search(
+            r"(?:anticipate|expect|expected|between)\s+(.{0,80}?(?:people|participants).{0,20})",
+            body,
+            re.I,
+        )
+        if match:
+            turnout = turnout_estimate_from_text(match.group(1))
 
-        images = self._crawl_article_images(html, source_id, article["url"])
         record = ProtestRecord(
             source=self.platform_id,
             source_id=source_id,
@@ -252,160 +239,11 @@ class MetPoliceSource(ProtestSource):
             url=article["url"],
             fetched_at=fetched_at,
             event_start=event_start,
-            event_end=event_end,
             form_up_location=form_up,
             route_text=route_text,
-            route_streets=parse_route_streets(route_text or ""),
-            estimated_participants_min=participants[0],
-            estimated_participants_max=participants[1],
-            estimated_participants_text=participants[2],
-            counter_protest_expected=counter,
-            raw_excerpt=body[:RAW_EXCERPT_MAX_CHARS],
-            extra={
-                "published_at": article.get("date_published"),
-                "description": article.get("description"),
-                "listing_source": CENTRAL_LONDON_TAG_URL,
-                "images": images,
-            },
+            turnout_estimate=turnout,
         )
         return [record]
-
-    def _crawl_article_images(
-        self, article_html: str, source_id: str, article_url: str
-    ) -> list[dict[str, Any]]:
-        images: list[dict[str, Any]] = []
-        for stub in self._extract_image_stubs(article_html):
-            if stub.get("role") == "stock":
-                continue
-            resolved = self._resolve_image_page(stub["page_url"])
-            if not resolved:
-                continue
-            entry: dict[str, Any] = {
-                "caption": stub.get("caption") or resolved.get("name"),
-                "role": stub.get("role"),
-                "page_url": stub["page_url"],
-                "content_url": resolved.get("content_url"),
-                "upload_date": resolved.get("upload_date"),
-            }
-            if self.download_images and self.media_dir and entry["content_url"]:
-                local_path = self._download_image(
-                    source_id=source_id,
-                    caption=entry["caption"] or "image",
-                    content_url=entry["content_url"],
-                    referer=stub["page_url"],
-                )
-                if local_path:
-                    entry["local_path"] = str(local_path)
-            images.append(entry)
-        return images
-
-    def _extract_image_stubs(self, html: str) -> list[dict[str, str]]:
-        stubs: list[dict[str, str]] = []
-        seen: set[str] = set()
-        patterns = [
-            r'panel__content-media-link"[^>]*href="([^"]+)"[^>]*title="([^"]+)"',
-            r'title="([^"]+)"[^>]*aria-label="\1"[^>]*href="(https://news\.met\.police\.uk/images/[^"]+)"',
-            r'href="(https://news\.met\.police\.uk/images/[^"]+)"',
-        ]
-        for pattern in patterns:
-            for match in re.finditer(pattern, html, re.I):
-                if len(match.groups()) == 2:
-                    if pattern.startswith("title"):
-                        caption, page_url = match.group(1), match.group(2)
-                    else:
-                        page_url, caption = match.group(1), match.group(2)
-                else:
-                    page_url, caption = match.group(1), ""
-                page_url = self._normalize_article_url(page_url)
-                if "/images/" not in page_url or page_url in seen:
-                    continue
-                seen.add(page_url)
-                caption = clean_html_text(caption) or self._caption_from_image_slug(page_url)
-                stubs.append(
-                    {
-                        "page_url": page_url,
-                        "caption": caption,
-                        "role": self._classify_image_role(caption),
-                    }
-                )
-        return stubs
-
-    def _resolve_image_page(self, page_url: str) -> Optional[dict[str, str]]:
-        html = self.client.get_text(page_url, referer=CENTRAL_LONDON_TAG_URL)
-        for payload in iter_json_ld(html, schema_type="MediaObject"):
-            content_url = payload.get("contentUrl")
-            if not content_url:
-                continue
-            return {
-                "name": payload.get("name", ""),
-                "content_url": self._high_resolution_image_url(content_url),
-                "upload_date": payload.get("uploadDate"),
-            }
-        og_image = re.search(r'<meta property="og:image" content="([^"]+)"', html, re.I)
-        if og_image:
-            return {
-                "name": "",
-                "content_url": self._high_resolution_image_url(og_image.group(1)),
-                "upload_date": None,
-            }
-        return None
-
-    def _high_resolution_image_url(self, content_url: str) -> str:
-        if "mnd-assets.mynewsdesk.com/image/upload/" not in content_url:
-            return content_url
-        suffix = content_url.split("/upload/", 1)[1]
-        token = suffix.split("/")[-1]
-        return (
-            f"https://mnd-assets.mynewsdesk.com/image/upload/"
-            f"q_auto:good,w_{HIGH_RES_IMAGE_WIDTH_PX}/{token}"
-        )
-
-    def _download_image(
-        self,
-        *,
-        source_id: str,
-        caption: str,
-        content_url: str,
-        referer: str,
-    ) -> Optional[Path]:
-        if self.media_dir is None:
-            raise MediaDirectoryNotConfiguredError(
-                "download_images=True requires media_dir to be set"
-            )
-        article_dir = self.media_dir / str(source_id)
-        article_dir.mkdir(parents=True, exist_ok=True)
-        slug = re.sub(r"[^a-z0-9]+", "-", caption.lower()).strip("-")[:MAX_SLUG_CHARS] or "image"
-        extension = ".jpg"
-        if ".png" in content_url.lower():
-            extension = ".png"
-        destination = article_dir / f"{slug}{extension}"
-        payload, content_type = self.client.get_bytes(content_url, referer=referer)
-        if content_type and "png" in content_type and extension != ".png":
-            destination = article_dir / f"{slug}.png"
-        destination.write_bytes(payload)
-        return destination
-
-    def _caption_from_image_slug(self, page_url: str) -> str:
-        slug = page_url.rstrip("/").split("/")[-1]
-        return slug.replace("-dot-jpg", ".jpg").replace("-", " ")
-
-    def _classify_image_role(self, caption: str) -> str:
-        lowered = caption.lower()
-        if "stock" in lowered:
-            return "stock"
-        if "form up" in lowered or "form-up" in lowered:
-            return "form_up_map"
-        if "procession route" in lowered or "route conditions" in lowered:
-            return "route_map"
-        if "rally" in lowered:
-            return "rally_map"
-        if "section 60" in lowered:
-            return "section_60aa_map"
-        if "emergency access" in lowered:
-            return "emergency_lane_map"
-        if "map" in lowered:
-            return "conditions_map"
-        return "media"
 
     def _extract_body_text(self, html: str) -> str:
         for payload in iter_json_ld(html, schema_type="NewsArticle"):
@@ -418,7 +256,7 @@ class MetPoliceSource(ProtestSource):
         div_chunks = [chunk for chunk in div_chunks if len(chunk) > MIN_DIV_CHUNK_CHARS]
         return "\n".join([*paragraphs, *div_chunks])
 
-    def _extract_section_12_route(self, text: str) -> Optional[str]:
+    def _extract_section_12_route(self, text: str) -> str | None:
         section = re.search(
             r"Section 12\(3\) Public Order Act 1986(.*?)(?:Section 14|Details of conditions|$)",
             text,
@@ -428,13 +266,14 @@ class MetPoliceSource(ProtestSource):
         patterns = [
             r"route shown on the map below, which is:\s*(.+?)(?:\.|They must begin)",
             r"route specified on the map below, namely\s*(.+?)(?:\.|Anyone participating)",
-            r"must not deviate from the route[^,]*,\s*(?:namely|which is:?)\s*(.+?)(?:\.|They must)",
+            r"must not deviate from the route[^,]*,\s*(?:namely|which is:?)\s*"
+            r"(.+?)(?:\.|They must)",
             r"travel via\s*(.+?)(?:\.|A rally|The assembly|Anyone participating)",
             r"take a prescribed route to\s*(.+?)(?:\.|The rally|The assembly)",
         ]
         return first_match_group(patterns, haystack)
 
-    def _extract_form_up(self, text: str) -> Optional[str]:
+    def _extract_form_up(self, text: str) -> str | None:
         patterns = [
             r"form up (?:on|in|at)\s+(?:the\s+)?(.+?)\s+at\s+\d",
             r"remain in the area shaded on the map below \((.+?)\)",
@@ -442,21 +281,8 @@ class MetPoliceSource(ProtestSource):
         ]
         return first_match_group(patterns, text)
 
-    def _extract_participants(
-        self, text: str
-    ) -> tuple[Optional[int], Optional[int], Optional[str]]:
-        match = re.search(
-            r"(?:anticipate|expect|expected|between)\s+(.{0,80}?(?:people|participants).{0,20})",
-            text,
-            re.I,
-        )
-        if match:
-            return parse_participant_estimate(match.group(1))
-        return None, None, None
-
-    def _extract_event_window(self, text: str, title: str) -> tuple[Optional[str], Optional[str]]:
+    def _extract_event_start(self, text: str, title: str) -> str | None:
         start_time = None
-        end_time = None
         start_match = re.search(
             r"(?:will form up|form up|begins?|begin|starts?|starting)\s+(?:on|at)?\s*"
             r"(?:[^.]{0,40}?\s)?(?:at\s+)?(\d{1,2}:\d{2}\s*hrs)",
@@ -465,13 +291,6 @@ class MetPoliceSource(ProtestSource):
         )
         if start_match:
             start_time = start_match.group(1).replace(" ", "")
-        end_match = re.search(
-            r"(?:must conclude by|conclude by|ends? by|ending at)\s+(\d{1,2}:\d{2}\s*hrs)",
-            text,
-            re.I,
-        )
-        if end_match:
-            end_time = end_match.group(1).replace(" ", "")
 
         date_match = re.search(
             r"\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+\d{1,2}\s+\w+",
@@ -484,8 +303,5 @@ class MetPoliceSource(ProtestSource):
             )
         event_date = date_match.group(0) if date_match else None
         if event_date and start_time:
-            return f"{event_date} {start_time}", (f"{event_date} {end_time}" if end_time else None)
-        return event_date, None
-
-
-MetPoliceCrawler = MetPoliceSource
+            return f"{event_date} {start_time}"
+        return event_date

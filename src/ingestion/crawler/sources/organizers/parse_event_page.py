@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import html
-import json
 import re
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import unquote
 
-from ingestion.crawler.parse_utils import clean_html_text, extract_paragraphs
+from ingestion.crawler.parse_utils import clean_html_text, extract_paragraphs, iter_json_ld
 
 _WEEKDAY_DATE_RE = re.compile(
     r"(?i)(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"
@@ -59,8 +58,7 @@ def parse_page_title(raw_html: str) -> str:
     title = re.search(r"(?is)<title>(.*?)</title>", raw_html)
     if title:
         text = clean_html_text(title.group(1))
-        text = re.sub(r"\s*[-|]\s*[^-|]+$", "", text).strip()
-        return text
+        return re.sub(r"\s*[-|]\s*[^-|]+$", "", text).strip()
     return ""
 
 
@@ -126,7 +124,8 @@ def parse_location_hint(raw_html: str, body: str) -> str | None:
         if pin:
             return pin.group(1).strip()
         loc = re.search(
-            r"(?im)(?:location|assemble|meeting point|gather(?:ing)?(?: at)?)\s*:?\s*([^\n.]{8,120})",
+            r"(?im)(?:location|assemble|meeting point|gather(?:ing)?(?: at)?)\s*:?\s*"
+            r"([^\n.]{8,120})",
             text,
         )
         if loc:
@@ -137,31 +136,6 @@ def parse_location_hint(raw_html: str, body: str) -> str | None:
         if name:
             return str(name)
     return None
-
-
-def parse_arrest_metadata(body: str) -> dict[str, object]:
-    """Event-only signals for court / arrest actions (e.g. Defend Our Juries)."""
-    if not body:
-        return {}
-    lowered = body.lower()
-    if "arrest" not in lowered and "court" not in lowered:
-        return {}
-
-    out: dict[str, object] = {}
-    arrest_match = re.search(
-        r"(?i)(\d{1,4})\s+(?:people\s+)?arrested",
-        body,
-    )
-    if arrest_match:
-        out["arrests_reported"] = int(arrest_match.group(1))
-
-    place = re.search(
-        r"(?im)(?:at|outside|near)\s+(?:the\s+)?([^\n.]{8,80}(?:court|magistrates|westminster)[^\n.]*)",
-        body,
-    )
-    if place:
-        out["action_place"] = place.group(1).strip()
-    return out
 
 
 def parse_route_hint(body: str) -> str | None:
@@ -175,11 +149,7 @@ def parse_route_hint(body: str) -> str | None:
 
 
 def _json_ld_events(raw_html: str) -> dict[str, Any] | None:
-    for match in re.finditer(r'<script type="application/ld\+json">(.*?)</script>', raw_html, re.S):
-        try:
-            payload = json.loads(match.group(1))
-        except json.JSONDecodeError:
-            continue
+    for payload in iter_json_ld(raw_html):
         event = _find_event_node(payload)
         if event:
             return event

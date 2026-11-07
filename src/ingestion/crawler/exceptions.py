@@ -16,14 +16,3 @@ class SourceUnavailableError(IngestionError):
 
 class UnknownPlatformError(IngestionError):
     """A platform ID was requested that no registered source provides."""
-
-
-class MediaDirectoryNotConfiguredError(IngestionError):
-    """Image download was requested without a media directory."""
-
-
-class CurlNotAvailableError(SourceUnavailableError):
-    """The curl binary is required for an SSL fallback but was not found."""
-
-    def __init__(self, reason: str = "curl not found for SSL fallback") -> None:
-        super().__init__(platform_id="", reason=reason)

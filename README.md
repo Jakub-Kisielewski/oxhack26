@@ -129,7 +129,7 @@ streamlit run app.py
 | Map | `boundary`, `segments` (walk network with `n_published_route_examples` and all `edge_features` columns: `width_m`, `capacity_people`, `betweenness_*`, `*_degree`, `in_*_zone`), `main_edges`, `targets` (embassies have an ISO `country` code), `open_spaces` (`area_m2` = rally capacity), `shops`, `warehouses`, `legal_zones` (no-entry sites, Parliament Square controlled area, Royal Parks) |
 | Grid | `grid_cells` (~200 m hexagons), `grid_adjacency` (neighbouring cells), `segment_cells` (which cells each street crosses) |
 | Events and routes | `events`, `waypoints`, `route_segments` (ordered `segment_id`s per `event_id`), `event_context`, `cause_targets` |
-| Context | `crimes`, `tfl_disruptions`, `acled_events`, `weather_hourly`, `pageviews_daily`, `protest_signals` (latest crawler run) |
+| Context | `weather_hourly`, `pageviews_daily` |
 | Bookkeeping | `load_log` (rows and load time per table) |
 
 Geometry columns are lon/lat (EPSG:4326): `geom` on point and street tables, `geometry` on landmark layers. Use the `meters(a, b)` macro for distances; it works for points, lines and polygons. Don't use `ST_Distance_Sphere` directly: it expects lat/lon axis order.
@@ -292,31 +292,14 @@ Sources may change or become unavailable over time. Their reuse and redistributi
 
 
 
-## Protest ingestion
+## Protest discovery (crawler)
 
-This crawler runs as the `crawl` step of `python ingest.py`. To run it on its own from the repo root (use `.venv`, not conda `base`):
+The crawler is **not** a step in `python ingest.py`. It proposes new marches for human review:
 
 ```bash
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-python ingest.py --only crawl   # or: python -m src.ingestion
+pip install -e .
+lpp-ingest --output-dir data    # writes data/candidates.csv
+lpp-ingest --list-platforms     # met_police, psc, cnd, stop_the_war, together_alliance
 ```
 
-Ingest Met Police conditions posts, OSAC London demonstration alerts, TfL road disruptions, and organizer sites. List platform IDs with `python -m src.ingestion --list-platforms`.
-
-Each pipeline run writes **one subfolder per platform** (extraction source):
-
-```
-data/runs/{run_id}/
-  met_police/
-    records.json
-    media/{article_id}/*.jpg    # condition route maps
-  osac/
-    records.json
-  tfl_road_disruption/
-    records.json
-  _all/
-    protests_flat.json
-    protests.parquet
-```
-
-After `python -m src.ingestion`, open e.g. `data/runs/<run_id>/osac/records.json`.
+Promote selected rows into `src/ingestion/route_research/seed/events.csv` and `waypoints.csv`, then run the normal build.
