@@ -293,4 +293,5 @@ awk -F, 'NR>1 && $<precip_col> > 0.5' data/route_research/normalised/event_conte
 |---|---|---|
 | 2026-11-07 | 1 | Seed evidence: 65 events, turnout 65/65; seed URLs — marble-arch.london 29, met 15, PSC 12; **0** OSAC/TfL → drop those sources |
 | 2026-11-07 | 2–8 | Scope reduction implemented: 9-field `ProtestRecord`, `candidates.csv` pipeline, Met + 4 organiser sites, plain `requests` client, tests + CI |
+| 2026-11-07 | fix | Restored `marble_arch_security` (29 seed URLs); organiser sites cut to PSC only; planning docs moved to `docs/internal/` |
 | 2026-11-07 | 9 | `route_model.fit` records `prior_only` for `rain_x_main` / `dark_x_main` when training support &lt; 2 events |

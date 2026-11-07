@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ingestion.crawler.constants import DEFAULT_MET_LIMIT
 from ingestion.crawler.sources.base import ProtestSource
+from ingestion.crawler.sources.marble_arch_security import MarbleArchSecuritySource
 from ingestion.crawler.sources.met_police import MetPoliceSource
 from ingestion.crawler.sources.organizers import ORGANIZER_SITES
 from ingestion.crawler.sources.organizers.crawler import OrganizerSiteSource
@@ -12,12 +13,14 @@ from ingestion.crawler.sources.organizers.crawler import OrganizerSiteSource
 def default_sources(
     *,
     met_limit: int = DEFAULT_MET_LIMIT,
+    marble_arch_limit: int | None = None,
     organizer_event_days_back: int = 0,
     organizer_event_days_ahead: int = 0,
 ) -> list[ProtestSource]:
-    """Met Police conditions notices plus pruned organiser sites."""
+    """Met Police, Marble Arch BID feed, and organiser sites with seed provenance."""
     return [
         MetPoliceSource(limit=met_limit),
+        MarbleArchSecuritySource(limit=marble_arch_limit),
         *(
             OrganizerSiteSource(
                 site,

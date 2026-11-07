@@ -7,7 +7,7 @@ Run these steps in order from the repo root.
 | Step | Command | How often |
 |---|---|---|
 | 1. Python environment | `python3.12 -m venv .venv`, activate, `pip install -r requirements.txt` | once |
-| 2. Optional credentials | `export ACLED_EMAIL=... ACLED_PASSWORD=... TFL_APP_KEY=...` | if you want those sources |
+| 2. Optional credentials | none required for the default build | — |
 | 3. All ingestion + database | `python ingest.py` (with the app closed) | whenever you want fresh data |
 | 4. Train the route model | `python -m src.models.train` | after each ingestion |
 | 5. Check model and UI agree | `python -m src.contract.selftest` | after training, before pushing |
@@ -35,14 +35,7 @@ pip install -r requirements.txt
 
 DuckDB's spatial extension comes with `pip install` (the `duckdb-extension-spatial` package) and is installed automatically the first time the database is opened. **Intel Macs** have no wheel for it: see [Spatial extension on Intel Macs](#spatial-extension-on-intel-macs).
 
-### 2. Optional credentials
-```bash
-export ACLED_EMAIL='...' ACLED_PASSWORD='...'   # ACLED step is skipped without these (or use --acled-file)
-export TFL_APP_KEY='...'                          # optional, raises TfL rate limits
-```
-Never commit credentials.
-
-### 3. Ingestion: one command
+### 2. Ingestion: one command
 ```bash
 python ingest.py
 ```
@@ -54,19 +47,13 @@ This runs every step in dependency order:
 | `boundary` | Zones 1-2 polygon from TfL station zones | `data/route_research/raw/boundary/` |
 | `osm` | OSM walk network + main-road network inside the boundary | `data/route_research/raw/osm/` |
 | `landmarks` | Protest targets, squares/parks (capacity), shops, warehouses | `data/route_research/raw/landmarks/` |
-| `police` | Public-order crimes for the months of the seed events | `data/route_research/raw/police/` |
-| `tfl` | Snapshot of current TfL road disruptions and tube status | `data/route_research/raw/tfl/` |
-| `acled` | ACLED London protest events (only with credentials) | `data/route_research/raw/acled/` |
 | `seed-coords` | Waypoint coordinates from the reviewed geocode cache | `data/route_research/coordinate_review.csv` |
 | `normalize` | Street segments, route labels, context tables | `data/route_research/normalised/` |
 | `edge-features` | Per street: usable width and crowd capacity, betweenness centrality, junction degree, bridge, legal-zone and Royal Park flags | `data/route_research/normalised/edge_features.csv` |
-| `grid` | ~200 m hexagon grid, cell neighbours, street-to-cell lookup | `data/route_research/normalised/grid_*`, `segment_cells.csv` |
-| `export-parquet` | Parquet/GeoParquet copies of the normalised tables | `data/route_research/normalised/parquet/` |
 | `weather` | Hourly Open-Meteo weather around each event date | `data/route_research/raw/weather/` |
 | `pageviews` | Daily Wikipedia views per protest cause | `data/route_research/raw/pageviews/` |
 | `event-context` | Per-event calendar, daylight, weather, media salience features | `data/route_research/normalised/event_context.csv` |
 | `cause-targets` | Where each cause marches to (`seed/cause_targets.csv`), embassies located from the data, checked against the seed routes | `data/route_research/normalised/cause_targets.csv` |
-| `crawl` | Tier 1 crawlers (Met Police, OSAC, TfL, Marble Arch, organiser sites) | `data/runs/<run_id>/` |
 | `database` | Loads all of the above into DuckDB (see [Database](#database)) | `data/protest.duckdb` |
 
 Useful options:
@@ -74,20 +61,17 @@ Useful options:
 ```bash
 python ingest.py --list                       # steps and their dependencies
 python ingest.py --only weather event-context # run just these
-python ingest.py --skip crawl acled           # leave these out
-python ingest.py --refresh                    # redo cached steps (boundary, osm, landmarks, police, edge-features, grid)
+python ingest.py --refresh                    # redo cached steps (boundary, osm, landmarks, edge-features)
 python ingest.py --refresh osm                # re-download just one of them
-python ingest.py --acled-file path/to/export.csv
-python ingest.py --since 2024-01-01           # more police/crawler history (default: 1 January this year)
 ```
 
-- The first run is slow: the OSM network and landmarks for zones 1-2 take several minutes each. The crawler runs in the background alongside the other steps (log in `data/runs/ingest_crawl.log`). Later runs skip downloads whose files already exist.
-- `--since` only limits the police months and the crawler's organiser-event window. All 65 seed routes are always used for training.
+- The first run is slow: the OSM network and landmarks for zones 1-2 take several minutes each. Later runs skip downloads whose files already exist.
+- All 65 seed routes are always used for training.
 - Landmarks retry busy Overpass servers with backoff across three mirrors. If a layer still fails, re-run `python ingest.py --only landmarks` and only the missing layers are fetched.
 - If a step fails, the steps that depend on it are skipped, the rest still run, and a summary is printed at the end. Re-run a failed step with `--only <step>`.
 - Every step can also be run on its own, see `src/ingestion/route_research/README.md`.
 
-### 4. Train the route model
+### 3. Train the route model
 ```bash
 python -m src.models.train           # full leave-one-event-out backtest
 python -m src.models.train --quick   # 5-event smoke test while developing (don't report its numbers)
@@ -98,7 +82,7 @@ Training reads `data/protest.duckdb` read-only and writes `data/models/graph.pkl
 route model doesn't beat shortest path. Re-train after every ingestion. Add `--force-graph` to rebuild the
 street graph. See `src/models/README.md`.
 
-### 5. Check the model and UI agree
+### 4. Check the model and UI agree
 ```bash
 python -m src.contract.selftest                    # mock and (if trained) real predictor
 python -m src.contract.selftest --predictor real   # just the trained model
@@ -106,7 +90,7 @@ python -m src.contract.selftest --predictor real   # just the trained model
 Runs every model method through the shared contract (`src/contract/`) and checks types, probability ranges,
 coordinate order and sorting. Both should print `PASS`. Run it before every push.
 
-### 6. Run the app
+### 5. Run the app
 ```bash
 streamlit run app.py
 ```
@@ -160,23 +144,13 @@ python -c "import duckdb; duckdb.connect().execute(\"INSTALL './spatial.duckdb_e
 ```
 DuckDB downloads extensions silently with no progress bar, which is why this is done with curl (`-C -` resumes an interrupted download). Once it prints `ok` the extension is cached in `~/.duckdb/extensions/` and you can delete the file.
 
-## LIST OF APIS CURRENTLY USED
-https://news.met.police.uk/latest_news/tag/central-london
-https://www.osac.gov/Country/UnitedKingdom/Content/Search?contentTypes=Report&subContentTypes=Travel%20Advisories%2CAlerts
-https://api.tfl.gov.uk/Road/all/Disruption
-https://marble-arch.london/security-updates/
-https://palestinecampaign.org/events/
-https://cnduk.org/events/
-https://www.counterfire.org/events/
-https://www.foa.org.uk/events
-https://www.stopwar.org.uk/events/
-https://www.mabonline.net/media/press-releases
-https://thepeoplesassembly.org.uk/news
-https://www.togetheralliance.org.uk/
-https://standuptoracism.org.uk/events/
-https://extinctionrebellion.uk/category/actions/
-https://youthdemand.org/news-press/
-https://defendourjuries.net/press-releases/
+## Discovery crawler URLs (optional, not part of `ingest.py`)
+
+Used by `lpp-ingest` only — see [Protest discovery](#protest-discovery-crawler):
+
+- https://news.met.police.uk/latest_news/tag/central-london
+- https://marble-arch.london/security-updates/
+- https://palestinecampaign.org/events/
 
 
 
@@ -191,16 +165,6 @@ The `src/ingestion/route_research/` pipeline downloads additional geographic, hi
 
 - **OpenStreetMap / OSMnx — London pedestrian street network:** https://www.openstreetmap.org/  
   Documentation: https://osmnx.readthedocs.io/en/stable/
-
-- **UK Police Data API — Historical public-order offence records:** https://data.police.uk/api/crimes-street/public-order  
-  Documentation: https://data.police.uk/docs/method/crime-street/
-
-- **TfL Unified API — Road disruptions:** https://api.tfl.gov.uk/Road/all/Disruption
-
-- **TfL Unified API — Tube line status:** https://api.tfl.gov.uk/Line/Mode/tube/Status
-
-- **ACLED — Historical protest-event data:** https://acleddata.com/conflict-data/data-export-tool  
-  API documentation: https://acleddata.com/api-documentation/getting-started
 
 - **OpenStreetMap Nominatim — Geocoding historical protest waypoints:** https://nominatim.openstreetmap.org/  
   Usage policy: https://operations.osmfoundation.org/policies/nominatim/
@@ -299,7 +263,7 @@ The crawler is **not** a step in `python ingest.py`. It proposes new marches for
 ```bash
 pip install -e .
 lpp-ingest --output-dir data    # writes data/candidates.csv
-lpp-ingest --list-platforms     # met_police, psc, cnd, stop_the_war, together_alliance
+lpp-ingest --list-platforms     # met_police, marble_arch_security, psc
 ```
 
 Promote selected rows into `src/ingestion/route_research/seed/events.csv` and `waypoints.csv`, then run the normal build.

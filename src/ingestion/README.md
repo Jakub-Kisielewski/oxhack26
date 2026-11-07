@@ -11,7 +11,7 @@ The crawler **proposes** candidate marches (date, title, form-up, route text, tu
 
 ## Crawl etiquette
 
-Discovery reads **public** Met Police conditions notices and selected organiser event listings. Requests use:
+Discovery reads **public** Met Police conditions notices, the Marble Arch London BID security feed, and PSC organiser listings. Requests use:
 
 - An identifying `User-Agent` (`DISCOVERY_USER_AGENT` in `ingestion.crawler.constants`)
 - `min_interval_sec` throttling between requests

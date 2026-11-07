@@ -33,27 +33,4 @@ ORGANIZER_SITES: tuple[OrganizerSiteConfig, ...] = (
         seed_urls=("https://palestinecampaign.org/events/",),
         pagination="query_pno",
     ),
-    OrganizerSiteConfig(
-        platform_id="cnd",
-        platform_name="Campaign for Nuclear Disarmament (CND)",
-        platform_url="https://cnduk.org",
-        seed_urls=("https://cnduk.org/events/",),
-        pagination="query_pno",
-    ),
-    OrganizerSiteConfig(
-        platform_id="stop_the_war",
-        platform_name="Stop the War Coalition",
-        platform_url="https://www.stopwar.org.uk",
-        seed_urls=("https://www.stopwar.org.uk/events/",),
-        pagination="query_pno",
-    ),
-    OrganizerSiteConfig(
-        platform_id="together_alliance",
-        platform_name="Together Alliance",
-        platform_url="https://www.togetheralliance.org.uk",
-        seed_urls=("https://www.togetheralliance.org.uk/",),
-        include_actionnetwork=True,
-        extra_domains=("actionnetwork.org",),
-        pagination="none",
-    ),
 )

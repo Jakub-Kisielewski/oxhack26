@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Final, TypedDict
+from typing import Final, TypedDict
 
-from ingestion.crawler.models import ProtestRecord
+from ingestion.crawler.sources.marble_arch_security import MarbleArchSecuritySource
 from ingestion.crawler.sources.met_police import MetPoliceSource
 from ingestion.crawler.sources.organizers.sites import ORGANIZER_SITES
 
@@ -22,7 +22,12 @@ def build_platform_catalog() -> dict[str, PlatformMeta]:
             "platform_id": MetPoliceSource.platform_id,
             "platform_name": MetPoliceSource.platform_name,
             "platform_url": MetPoliceSource.platform_url,
-        }
+        },
+        MarbleArchSecuritySource.platform_id: {
+            "platform_id": MarbleArchSecuritySource.platform_id,
+            "platform_name": MarbleArchSecuritySource.platform_name,
+            "platform_url": MarbleArchSecuritySource.platform_url,
+        },
     }
     for site in ORGANIZER_SITES:
         catalog[site.platform_id] = {
@@ -45,10 +50,3 @@ def platform_meta(platform_id: str) -> PlatformMeta:
             "platform_url": "",
         },
     )
-
-
-def record_export_dict(record: ProtestRecord) -> dict[str, Any]:
-    """Serialise a record plus platform metadata for JSON export."""
-    data = record.to_dict()
-    data.update(platform_meta(data.get("source", "")))
-    return data

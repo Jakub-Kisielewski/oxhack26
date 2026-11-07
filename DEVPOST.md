@@ -47,7 +47,7 @@ We built one pipeline (`python ingest.py`) that pulls every source, cleans it an
 | Open-Meteo | Hourly weather: forecast, recorded, or monthly average | Rain and cold reduce turnout; rain may change routes |
 | Wikipedia pageviews | Daily views of each cause's articles, before the march only | Media attention spikes predict bigger, more charged marches |
 | UK bank holidays, Hijri calendar, sunset times | Weekday, holiday, Ramadan, daylight after the start | Turnout and darkness effects |
-| Police.uk, TfL, ACLED | Public-order crime, road disruptions, wider protest events | Context on the map and for planners |
+| Committed seed CSVs + Met / Marble Arch / organiser archives | Hand-reviewed historical routes and provenance URLs | Training labels and honest backtest scope (not live Police.uk or ACLED feeds) |
 
 No single source can predict a route. The value comes from joining them on one street graph: a march plan becomes a sequence of street choices, and every choice can be explained by the street's width, the cause's targets, the weather and the day.
 
@@ -109,7 +109,7 @@ If the route model doesn't beat shortest path, training prints a warning not to 
 
 The system is five layers, and each one only reads from the layer above it.
 
-1. **Public data sources:** march plans, OpenStreetMap, TfL zones, Wikidata, Open-Meteo weather, Wikipedia pageviews, calendars, Police.uk, ACLED.
+1. **Public data sources:** hand-curated march plans (seed), OpenStreetMap, TfL station zones (boundary only), Wikidata, Open-Meteo weather, Wikipedia pageviews, calendars.
 2. **Ingestion (`python ingest.py`):** download, geocode, snap routes to streets, derive street features, build the hexagon grid and per-march context.
 3. **DuckDB with the spatial extension:** one database holding map, grid, events, routes and context tables, with distances measured in British National Grid metres.
 4. **Models:** conditional logit route choice, absorbing Markov chain, Yen top routes, turnout, crowd-physics overspill, shop and police decisions.
