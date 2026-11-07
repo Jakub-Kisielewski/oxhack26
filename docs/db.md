@@ -161,8 +161,8 @@ FROM events e LEFT JOIN event_context c USING (event_id)
 and then, in Python:
 
 ```python
-turnout=_first_int(turnout),       # regex: r"\d[\d,]*"
-start_time=_hhmm(start),           # regex: r"^\s*(\d{1,2}):(\d{2})"
+turnout = (_first_int(turnout),)  # regex: r"\d[\d,]*"
+start_time = (_hhmm(start),)  # regex: r"^\s*(\d{1,2}):(\d{2})"
 ```
 
 **`turnout` is an integer in the seed CSV, filled for 65 of 65 events.** It is loaded as whatever DuckDB infers, cast back to text in SQL, then recovered with a regular expression in Python. Same for `event_date` and `start_time`. That round trip exists because nothing in the pipeline ever declared what these columns are.
@@ -247,7 +247,7 @@ from src.database.types import CauseOption, HistoricalEvent, LonLat, Path
 while its two sibling modules do:
 
 ```python
-from pathlib import Path          # db.py:1, load.py:8
+from pathlib import Path  # db.py:1, load.py:8
 ```
 
 So within `src/database/`, `Path` means a filesystem path in two modules and a list of coordinates in the other two. Nothing breaks today because no module imports both, but it is one import away from a confusing bug, and a reader scanning the package has to track which `Path` is in scope.

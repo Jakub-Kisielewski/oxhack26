@@ -7,7 +7,6 @@ from pathlib import Path
 from src.database.db import get_connection, init_schema
 from src.database.load import load
 
-
 EVENTS_HEADER = (
     "event_id,event_date,event_name,event_category,official_planned_waypoints,"
     "start_time,end_time,route_detail,source_url,evidence_type,"
@@ -54,7 +53,8 @@ def test_events_turnout_parsed_as_integer(tmp_path: Path) -> None:
     norm = tmp_path / "normalised"
     norm.mkdir(parents=True)
     (norm / "events.csv").write_text(
-        EVENTS_HEADER + "E1,2026-06-01,Test,protest,,12:00,13:00,detailed,http://x,,no,,,50000±30000\n",
+        EVENTS_HEADER
+        + "E1,2026-06-01,Test,protest,,12:00,13:00,detailed,http://x,,no,,,50000±30000\n",
         encoding="utf-8",
     )
     con = get_connection(path=tmp_path / "typed.duckdb")

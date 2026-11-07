@@ -15,7 +15,8 @@ def test_newer_duckdb_without_rebuild_returns_one(tmp_path: Path) -> None:
     db.touch()
 
     def raise_newer(*_args, **_kwargs):
-        raise duckdb.IOException("file has been written by a newer version of DuckDB")
+        msg = "file has been written by a newer version of DuckDB"
+        raise duckdb.IOException(msg)
 
     with patch("src.database.load.get_connection", side_effect=raise_newer):
         assert main(["--db", str(db)]) == 1

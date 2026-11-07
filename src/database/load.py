@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import logging
-import sys
 from pathlib import Path
 
 import duckdb
@@ -60,7 +59,7 @@ def fix_wkb_geometry(con: duckdb.DuckDBPyConnection, table: str) -> None:
     ).fetchall():
         if name == "geometry" and dtype == "BLOB":
             con.execute(
-                f"ALTER TABLE {table} ALTER geometry TYPE GEOMETRY USING ST_GeomFromWKB(geometry)"  # noqa: S608 — table from loader plan keys only
+                f"ALTER TABLE {table} ALTER geometry TYPE GEOMETRY USING ST_GeomFromWKB(geometry)"
             )
 
 
@@ -118,7 +117,8 @@ def load_declared(con: duckdb.DuckDBPyConnection, table: str, sql: str) -> None:
     elif table == "waypoints":
         con.execute(waypoints_load_sql(sql))
     else:
-        raise ValueError(f"not a declared table: {table}")
+        msg = f"not a declared table: {table}"
+        raise ValueError(msg)
 
 
 def segments_sql(route_dir: Path) -> str | None:
@@ -202,7 +202,7 @@ def load(con: duckdb.DuckDBPyConnection, route_dir: Path) -> dict[str, str]:
             if table in DECLARED_TABLES:
                 load_declared(con, table, sql)
             else:
-                con.execute(f"CREATE OR REPLACE TABLE {table} AS {sql}")  # noqa: S608 — table from plan keys only
+                con.execute(f"CREATE OR REPLACE TABLE {table} AS {sql}")
                 fix_wkb_geometry(con, table)
             rows = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]  # noqa: S608 — table from plan keys only
             con.execute(
@@ -238,14 +238,14 @@ def main(argv: list[str] | None = None) -> int:
         con = get_connection(path=a.db)
     except duckdb.IOException as exc:
         if "lock" in str(exc).lower():
-            logger.error("%s is open elsewhere. Close it and retry.", a.db)
+            logger.exception("%s is open elsewhere. Close it and retry.", a.db)
             return 1
         if "newer version of DuckDB" not in str(exc):
             raise
         stamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
         backup = a.db.with_name(f"{a.db.stem}.{stamp}{a.db.suffix}.old")
         if not a.rebuild:
-            logger.error(
+            logger.exception(
                 "%s was written by a newer DuckDB and cannot be opened.\n"
                 "Re-run with --rebuild to move it to %s and rebuild.",
                 a.db,

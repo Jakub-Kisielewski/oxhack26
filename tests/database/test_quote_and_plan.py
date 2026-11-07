@@ -8,7 +8,7 @@ from src.database.load import plan, quote, reader_sql, with_points
 
 
 def test_quote_escapes_single_quotes() -> None:
-    assert quote(Path("/tmp/o'brien/data.csv")) == "'/tmp/o''brien/data.csv'"
+    assert quote(Path("data/o'brien/events.csv")) == "'data/o''brien/events.csv'"
 
 
 def test_reader_sql_csv() -> None:
