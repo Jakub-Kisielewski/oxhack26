@@ -1,3 +1,5 @@
+"""DuckDB connection setup and shared schema (spatial extension, distance macro)."""
+
 from pathlib import Path
 
 import duckdb
@@ -21,6 +23,7 @@ def _install_spatial(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def get_connection(read_only: bool = False, path: Path = DB_PATH) -> duckdb.DuckDBPyConnection:
+    """Open ``path``, loading the spatial extension on first use."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(path), read_only=read_only)
@@ -33,6 +36,7 @@ def get_connection(read_only: bool = False, path: Path = DB_PATH) -> duckdb.Duck
 
 
 def init_schema(con: duckdb.DuckDBPyConnection) -> None:
+    """Create ``load_log`` and the British National Grid ``meters`` macro."""
     con.execute("""
         CREATE TABLE IF NOT EXISTS load_log (
             table_name   VARCHAR PRIMARY KEY,

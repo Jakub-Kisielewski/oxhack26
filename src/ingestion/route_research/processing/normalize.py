@@ -126,7 +126,7 @@ def make_streets(graph: nx.MultiDiGraph, out: Path) -> pd.DataFrame:
     return frame
 
 
-def join_waypoints(  # noqa: C901 — event/waypoint snap and path join; refactor tracked in docs/phase2.md
+def join_waypoints(  # noqa: C901 — event/waypoint snap and path join; refactor when complexity is reduced
     graph: nx.MultiDiGraph,
     events: pd.DataFrame,
     waypoints: pd.DataFrame,

@@ -1,4 +1,14 @@
-# London Protest Predictor
+# London Protest Predictor — OxHack 2026 submission
+
+> **This is the hackathon submission as written in October 2026**, describing the
+> system built over the event weekend, including the prediction and decision tools
+> and the five-page interface.
+>
+> The repository has since been scoped down to **ingestion → DuckDB → conditional
+> logit training → backtest visualisation**, because the prediction and decision
+> layers had no validated model consumer. See
+> [docs/design-decisions.md](docs/design-decisions.md) for what was removed and why.
+> For the current system, read the [README](README.md).
 
 ## Tagline
 
@@ -30,7 +40,7 @@ The app has five tools, each answering one question for one user.
 | Police placement | Where do N officers reduce the most risk? | Officer posts on the map and total spill risk before and after |
 | Model insights | How good is the model, and why did it predict this? | Backtest against baselines, the drivers of the latest prediction |
 
-When the full UI is enabled, predictions can show a **Conditions & effects** panel: precipitation in the first four hours and daylight after the march start (what the ingestion pipeline actually feeds the route model), plus labelled effects (**learned from past marches** vs **hand-set assumption**). Media salience and UK calendar flags were considered and dropped for lack of model consumers (see `docs/phase2.md`).
+Predictions in the hackathon build could show a **Conditions & effects** panel: precipitation in the first four hours and daylight after the march start, plus labelled effects (**learned from past marches** vs **hand-set assumption**). Media salience and UK calendar flags were considered and dropped for lack of model consumers (see [docs/design-decisions.md#phase-2-scope-cut](docs/design-decisions.md#phase-2-scope-cut)).
 
 ## The data
 
@@ -57,7 +67,7 @@ A march is modelled as a walk through the street network: at every junction it p
 3. **Top routes: Yen's k-shortest paths** on −log(probability), so the top routes are the likeliest paths, each with its share.
 4. **Destinations:** candidate end points come from past marches for the same cause and the cause's targets (an embassy, Parliament, Downing Street), weighted by how often they were used.
 5. **Turnout:** the median of past marches for the cause (user scope may simplify condition scaling in the demo app).
-6. **Overspill:** (removed from this repo's scope; crowd-capacity columns were cut from ingestion — see `docs/crowd-density-note.md`).
+6. **Overspill:** crowd-physics along streets using capacity estimates from OSM width (see [docs/crowd-density-note.md](docs/crowd-density-note.md) for the research; removed from the scoped repository).
 
 $$
 P(b \mid a) = \frac{\exp(\theta^\top x(a,b,c,d))}{\sum_{b' \in N(a)} \exp(\theta^\top x(a,b',c,d))}
@@ -84,13 +94,9 @@ Every training run ends with a **leave-one-march-out backtest**, and the results
 - **Shortest path:** the shortest walk to the likeliest end point, which is what a planner would assume with no model.
 - **Random walk:** an equal chance at every junction, the floor.
 
-| Metric | What it measures | Route model | Shortest path | Random walk |
-| --- | --- | --- | --- | --- |
-| Log-likelihood per step | Probability given to the turn the march actually took (higher is better) | [fill in] | [fill in] | [fill in] |
-| Top route overlap | Share of the real route's streets on the predicted route | [fill in] | [fill in] | 0% |
-| True end in top 3 | One of the top 3 end points is within 250 m of the real end | [fill in] | [fill in] | 0% |
+Leave-one-march-out metrics for the hackathon build were shown in the five-page app after `python -m src.models.train`. The scoped repository records the same backtest in `data/models/backtest.json` and charts it on the single **Model insights** page (`streamlit run app.py`); see the [README](README.md) quickstart and screenshot.
 
-If the route model doesn't beat shortest path, training prints a warning not to claim it does. Sanity checks also confirm that probabilities stay between 0 and 1, spill never lands on the march's own route, and police posts never exceed the officers available.
+If the route model doesn't beat shortest path, training prints a warning not to claim it does. The full hackathon build also ran sanity checks (probabilities in \[0, 1\], spill not on the march route, police posts within available officers); those checks applied to the removed decision tools.
 
 ## Why this is the best use of data for prediction and decision making
 

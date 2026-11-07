@@ -29,3 +29,6 @@ test_output/
 # Internal working notes, not part of the submission
 cursor.md
 progression_log.md
+docs/dev.md
+docs/phase2.md
+docs/doc_style.md

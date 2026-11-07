@@ -20,11 +20,13 @@ from src.models.destinations import candidates
 
 
 def jaccard(a, b):
+    """Jaccard similarity between two segment-id sequences."""
     sa, sb = set(a), set(b)
     return len(sa & sb) / len(sa | sb) if sa | sb else 0.0
 
 
 def step_loglik(g: MarchGraph, event: TrainingEvent, model: ChoiceModel | None, history, targets):
+    """Mean log-probability of realised turns (uniform if ``model`` is None)."""
     ll = []
     for a, b in zip(event.route, event.route[1:]):
         choices = g.next_ids(a)
@@ -43,6 +45,7 @@ def step_loglik(g: MarchGraph, event: TrainingEvent, model: ChoiceModel | None, 
 
 
 def baseline_ll(g: MarchGraph, event: TrainingEvent, route: list[str]):
+    """Mean log-likelihood under an epsilon-smoothed shortest-path policy."""
     # An epsilon-smoothed greedy-path distribution: 90% preferred turn,
     # 10% allocated to alternatives. This is a modelling choice, not a fitted score.
     pathnext = dict(zip(route, route[1:]))
@@ -64,6 +67,7 @@ def baseline_ll(g: MarchGraph, event: TrainingEvent, route: list[str]):
 def evaluate(
     g: MarchGraph, events: list[TrainingEvent], max_events: int | None = None
 ) -> BacktestResult:
+    """Leave-one-event-out backtest against shortest-path and random-walk baselines."""
     rows = []
     eligible = [e for e in events if len(e.route) >= 2]
     if max_events is not None:
@@ -136,12 +140,14 @@ def evaluate(
 
 
 def save_backtest(res: BacktestResult, path: Path):
+    """Write ``res`` to ``path`` as JSON for the Streamlit UI."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(res.to_dict(), f, indent=2, allow_nan=False)
 
 
 def read_backtest(path: Path):
+    """Load a backtest JSON file; return ``None`` if missing."""
     if not path.exists():
         return None
     data = json.loads(path.read_text())

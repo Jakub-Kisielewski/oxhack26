@@ -9,12 +9,16 @@ Path = list[LonLat]
 
 
 class _Serialisable:
+    """JSON-friendly ``dataclass`` mixin."""
+
     def to_dict(self) -> dict:
         return asdict(self)
 
 
 @dataclass
 class CauseOption(_Serialisable):
+    """Selectable protest cause with label and event count."""
+
     key: str
     label: str
     n_events: int
@@ -22,6 +26,8 @@ class CauseOption(_Serialisable):
 
 @dataclass
 class HistoricalEvent(_Serialisable):
+    """One historical march with geometry reconstructed from seed waypoints."""
+
     event_id: str
     name: str
     date: str
@@ -36,6 +42,8 @@ class HistoricalEvent(_Serialisable):
 
 @dataclass
 class Destination(_Serialisable):
+    """Weighted end-point candidate for destination scoring."""
+
     name: str
     lonlat: LonLat
     probability: float

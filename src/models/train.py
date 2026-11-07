@@ -13,6 +13,7 @@ from src.models.route_model import fit
 
 
 def main():
+    """Build the graph, fit the logit, run backtest, and write artefacts under ``data/models/``."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--force-graph", action="store_true")
     parser.add_argument(

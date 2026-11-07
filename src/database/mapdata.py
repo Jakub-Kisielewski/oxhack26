@@ -22,6 +22,7 @@ from src.database.types import CauseOption, HistoricalEvent, LonLat, Path
 
 @lru_cache(maxsize=1)
 def connection() -> duckdb.DuckDBPyConnection:
+    """Shared read-only DuckDB connection for this process."""
     return get_connection(read_only=True, path=DB_PATH)
 
 
@@ -87,6 +88,7 @@ def _hhmm(text) -> str | None:
 
 @lru_cache(maxsize=1)
 def list_causes() -> list[CauseOption]:
+    """Distinct protest causes with event counts for UI selectors."""
     counts = dict(
         cursor()
         .execute(
@@ -112,6 +114,7 @@ def list_causes() -> list[CauseOption]:
 
 @lru_cache(maxsize=2)
 def historical_events(protests_only: bool = True) -> list[HistoricalEvent]:
+    """Events with snapped routes and waypoints from DuckDB."""
     cur = cursor()
     events = cur.execute("""
         SELECT e.event_id, e.event_name, CAST(e.event_date AS VARCHAR), CAST(e.start_time AS VARCHAR),
@@ -153,6 +156,7 @@ def historical_events(protests_only: bool = True) -> list[HistoricalEvent]:
 
 
 def segment_paths(ids: list[str]) -> dict[str, Path]:
+    """GeoJSON line coordinates keyed by ``segment_id``."""
     if not ids:
         return {}
     rows = (
@@ -183,6 +187,7 @@ def cells_for_segments(ids: list[str]) -> dict[str, int]:
 
 @lru_cache(maxsize=1)
 def boundary() -> list[Path]:
+    """TfL zones 1–2 boundary polygon rings."""
     rings = []
     for (geo,) in cursor().execute("SELECT ST_AsGeoJSON(geom) FROM boundary").fetchall():
         rings.extend(_rings(geo))
@@ -191,6 +196,7 @@ def boundary() -> list[Path]:
 
 @lru_cache(maxsize=1)
 def legal_zones() -> list[dict]:
+    """Legal restriction polygons with rule metadata."""
     if not _table_exists("legal_zones"):
         return []
     out = []
@@ -205,6 +211,7 @@ def legal_zones() -> list[dict]:
 
 
 def targets(categories: list[str] | None = None) -> list[dict]:
+    """Embassy and landmark targets, optionally filtered by ``categories``."""
     country_sel = "country" if _has_column("targets", "country") else "NULL"
     sql = (
         f"SELECT name, category, {country_sel}, lon, lat FROM targets WHERE lat IS NOT NULL"  # noqa: S608 — country_sel is country|NULL literal
@@ -220,6 +227,7 @@ def targets(categories: list[str] | None = None) -> list[dict]:
 
 
 def cause_targets(cause: str | None) -> list[dict]:
+    """Weighted rally targets for a cause (plus ``any`` defaults)."""
     rows = (
         cursor()
         .execute(
@@ -259,6 +267,7 @@ def _bbox_params(lonlat: LonLat, radius_m: float) -> list[float]:
 
 
 def shops_near(lonlat: LonLat, radius_m: float = 300, limit: int = 50) -> list[dict]:
+    """OSM shops within ``radius_m`` of ``lonlat``, sorted by distance."""
     rows = (
         cursor()
         .execute(
@@ -282,6 +291,7 @@ def shops_near(lonlat: LonLat, radius_m: float = 300, limit: int = 50) -> list[d
 
 
 def search_shops(text: str, limit: int = 20) -> list[dict]:
+    """Substring search on shop names."""
     rows = (
         cursor()
         .execute(
@@ -299,6 +309,7 @@ def search_shops(text: str, limit: int = 20) -> list[dict]:
 
 @lru_cache(maxsize=1)
 def warehouses() -> list[dict]:
+    """Storage/warehouse points from OSM (legacy decision-layer data)."""
     fp = "footprint_m2" if _has_column("warehouses", "footprint_m2") else "NULL"
     rows = (
         cursor()
@@ -319,6 +330,7 @@ def warehouses() -> list[dict]:
 
 
 def cells(ids: list[int] | None = None) -> list[dict]:
+    """Hex grid cells; all cells when ``ids`` is None."""
     if ids is None:
         return _all_cells()
     wanted = set(ids)
@@ -341,6 +353,7 @@ def _all_cells() -> list[dict]:
 
 
 def cell_at(lonlat: LonLat) -> int | None:
+    """Hex ``cell_id`` containing ``lonlat``, if the grid table exists."""
     row = (
         cursor()
         .execute(
@@ -354,6 +367,7 @@ def cell_at(lonlat: LonLat) -> int | None:
 
 @lru_cache(maxsize=1)
 def assembly_points() -> list[dict]:
+    """Frequent march start waypoint names averaged in lon/lat."""
     rows = (
         cursor()
         .execute("""
@@ -372,6 +386,7 @@ def assembly_points() -> list[dict]:
 
 
 def in_boundary(lonlat: LonLat) -> bool:
+    """True when ``lonlat`` lies inside the zones 1–2 boundary."""
     return bool(
         cursor()
         .execute("SELECT bool_or(ST_Contains(geom, ST_Point(?, ?))) FROM boundary", list(lonlat))

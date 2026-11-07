@@ -20,6 +20,8 @@ PRIOR = np.array([0.5, 0.1, 0.05, 0.1, 0.1, -0.5, 0.1, -0.15, -0.3, 0.05, 0.05, 
 
 @dataclass
 class ChoiceModel:
+    """Fitted conditional logit weights with per-feature standardisation from training."""
+
     theta: list[float] = field(default_factory=lambda: list(PRIOR))
     mean: list[float] = field(default_factory=lambda: [0.0] * len(NAMES))
     std: list[float] = field(default_factory=lambda: [1.0] * len(NAMES))
@@ -28,6 +30,7 @@ class ChoiceModel:
     stats: dict = field(default_factory=dict)
 
     def to_json(self, path: Path):
+        """Serialise model parameters to JSON at ``path``."""
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
             json.dump(
@@ -45,6 +48,7 @@ class ChoiceModel:
 
     @classmethod
     def from_json(cls, path: Path):
+        """Load a model from JSON, padding newer features with ``PRIOR`` when needed."""
         with open(path) as f:
             d = json.load(f)
         saved = list(d["features"])
@@ -71,6 +75,7 @@ class ChoiceModel:
         history: dict | None = None,
         targets: list | None = None,
     ):
+        """Softmax turn probabilities over ``candidates`` at junction ``current``."""
         if not candidates:
             return np.array([])
         X = np.stack(
@@ -90,6 +95,7 @@ def fit(
     reg: float = LOGIT_REG,
     maxiter: int = LOGIT_MAXITER,
 ) -> ChoiceModel:
+    """Fit L-BFGS-B conditional logit on junction choices from ``events``."""
     history = history_counts(events)
     arrays = []
     indices = []

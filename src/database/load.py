@@ -26,10 +26,12 @@ CSV_OPTIONS = "header = true, sample_size = -1"
 
 
 def quote(path: Path) -> str:
+    """SQL-safe single-quoted POSIX path."""
     return "'" + path.as_posix().replace("'", "''") + "'"
 
 
 def reader_sql(path: Path, reader: str) -> str:
+    """``SELECT`` fragment for csv, geojson, or parquet at ``path``."""
     if reader == "csv":
         return f"SELECT * FROM read_csv({quote(path)}, {CSV_OPTIONS})"  # noqa: S608 — quoted local ingestion paths
     if reader == "geojson":
@@ -38,6 +40,7 @@ def reader_sql(path: Path, reader: str) -> str:
 
 
 def with_points(sql: str, lat: str, lon: str) -> str:
+    """Wrap ``sql`` to add a ``geom`` point column from lat/lon columns."""
     return (
         f"SELECT *, CASE WHEN TRY_CAST({lon} AS DOUBLE) IS NOT NULL AND TRY_CAST({lat} AS DOUBLE) IS NOT NULL "  # noqa: S608 — lat/lon names from TABLES metadata
         f"THEN ST_Point(TRY_CAST({lon} AS DOUBLE), TRY_CAST({lat} AS DOUBLE)) END AS geom FROM ({sql})"
@@ -45,6 +48,7 @@ def with_points(sql: str, lat: str, lon: str) -> str:
 
 
 def fix_wkb_geometry(con, table: str) -> None:
+    """Promote WKB ``geometry`` columns to DuckDB ``GEOMETRY``."""
     for name, dtype in con.execute(
         f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table}'"  # noqa: S608 — table from loader plan keys only
     ).fetchall():
@@ -55,6 +59,7 @@ def fix_wkb_geometry(con, table: str) -> None:
 
 
 def segments_sql(route_dir: Path) -> str | None:
+    """Join normalised segments geojson with route counts and edge features."""
     norm = route_dir / "normalised"
     geo, counts, feats = (
         norm / "segments.geojson",
@@ -74,6 +79,7 @@ def segments_sql(route_dir: Path) -> str | None:
 
 
 def plan(route_dir: Path) -> dict[str, tuple[Path | None, str | None]]:
+    """Map each DuckDB table to its source path and loader SQL (or skip)."""
     out = {}
     for table, (rel, reader, point_cols) in TABLES.items():
         path = route_dir / rel
@@ -95,6 +101,7 @@ def plan(route_dir: Path) -> dict[str, tuple[Path | None, str | None]]:
 
 
 def table_exists(con, table: str) -> bool:
+    """Return whether ``table`` is present in the connected database."""
     return bool(
         con.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?", [table]
@@ -103,6 +110,7 @@ def table_exists(con, table: str) -> bool:
 
 
 def derive(con, route_dir: Path) -> dict[str, str]:
+    """Post-load steps (e.g. Royal Park polygons into ``legal_zones``)."""
     status = {}
     open_spaces = route_dir / "raw/landmarks/open_spaces.geoparquet"
     if table_exists(con, "legal_zones") and open_spaces.exists():
@@ -120,6 +128,7 @@ def derive(con, route_dir: Path) -> dict[str, str]:
 
 
 def load(con, route_dir: Path) -> dict[str, str]:
+    """Create or replace all tables from ``plan(route_dir)``."""
     init_schema(con)
     status = {}
     for table, (path, sql) in plan(route_dir).items():
@@ -145,6 +154,7 @@ def load(con, route_dir: Path) -> dict[str, str]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point for ``python -m src.database.load``."""
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )

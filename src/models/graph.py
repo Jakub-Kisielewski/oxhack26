@@ -38,21 +38,26 @@ ALLOWED = {
 
 
 def xy(p: LonLat) -> tuple[float, float]:
+    """Approximate local easting/northing in metres for London."""
     return (float(p[0]) * 111_320 * math.cos(math.radians(51.51)), float(p[1]) * 111_320)
 
 
 def bearing(a: LonLat, b: LonLat) -> float:
+    """Bearing in radians from ``a`` to ``b`` in local metres."""
     x1, y1 = xy(a)
     x2, y2 = xy(b)
     return math.atan2(y2 - y1, x2 - x1)
 
 
 def angle(a: float, b: float) -> float:
+    """Normalised turn magnitude in ``[0, 1]`` between two bearings."""
     return abs((b - a + math.pi) % (2 * math.pi) - math.pi) / math.pi
 
 
 @dataclass
 class Segment:
+    """One directed walk-network edge with geometry and routing attributes."""
+
     id: str
     u: str
     v: str
@@ -74,6 +79,8 @@ class Segment:
 
 
 class MarchGraph:
+    """Directed street graph with spatial indexes for snapping and shortest paths."""
+
     def __init__(self, segments: dict[str, Segment]):
         self.segments = segments
         self.outgoing = defaultdict(list)
@@ -101,12 +108,14 @@ class MarchGraph:
         )
 
     def next_ids(self, sid: str) -> list[str]:
+        """Outgoing segment IDs at the end of ``sid``, excluding immediate U-turns."""
         if sid not in self.segments:
             return []
         a = self.segments[sid]
         return [b for b in self.outgoing[a.v] if self.segments[b].v != a.u]
 
     def nearest_segment(self, p: LonLat) -> tuple[str, float]:
+        """Return ``(segment_id, distance_m)`` to the nearest street polyline."""
         if self._midtree is None:
             raise ValueError("Empty street graph")
         d, i = self._midtree.query(xy(p), k=min(12, len(self._ids)))
@@ -118,21 +127,25 @@ class MarchGraph:
         return sid, line_distance(p, self.segments[sid].path)
 
     def nearest_node(self, p: LonLat) -> str:
+        """Graph node closest to ``p``."""
         if self._nodetree is None:
             raise ValueError("Empty street graph")
         return self._nodeids[int(self._nodetree.query(xy(p))[1])]
 
     def route_nodes(self, a: str, b: str) -> list[str]:
+        """Shortest node path from ``a`` to ``b``; empty if disconnected."""
         try:
             return nx.shortest_path(self.node_graph, a, b, weight="weight")
         except (nx.NetworkXNoPath, nx.NodeNotFound):
             return []
 
     def route_between(self, a: LonLat, b: LonLat) -> list[str]:
+        """Shortest walk as ordered segment IDs between two points."""
         nodes = self.route_nodes(self.nearest_node(a), self.nearest_node(b))
         return [self.pair_segment[(u, v)] for u, v in zip(nodes, nodes[1:])]
 
     def snap_route(self, points: list[LonLat]) -> list[str]:
+        """Chain shortest paths through ordered waypoints into one segment list."""
         if len(points) < 2:
             raise ValueError("Need at least two route points")
         route = []
@@ -144,6 +157,7 @@ class MarchGraph:
         return route
 
     def geometry(self, ids: list[str]) -> list[LonLat]:
+        """Concatenate polylines for ``ids`` into one coordinate list."""
         points = []
         for sid in ids:
             if sid not in self.segments:
@@ -154,6 +168,7 @@ class MarchGraph:
 
 
 def line_distance(p: LonLat, line: list[LonLat]) -> float:
+    """Minimum distance in metres from ``p`` to a polyline."""
     px, py = xy(p)
     best = float("inf")
     for a, b in zip(line, line[1:]):
@@ -166,6 +181,7 @@ def line_distance(p: LonLat, line: list[LonLat]) -> float:
 
 
 def from_database() -> MarchGraph:
+    """Build a march graph from the current DuckDB ``segments`` table."""
     cur = mapdata.cursor()
     # The DB stores EPSG:4326 lon/lat geometries; do not swap coordinate axes.
     rows = cur.execute("""
@@ -247,11 +263,13 @@ def from_database() -> MarchGraph:
 
 
 def load_graph(path: Path = GRAPH_PATH) -> MarchGraph:
+    """Load a pickled graph written by ``build_graph``."""
     with open(path, "rb") as f:
         return pickle.load(f)  # noqa: S301 — locally generated graph artefact from training
 
 
 def build_graph(path: Path = GRAPH_PATH, force: bool = False) -> MarchGraph:
+    """Load or rebuild the street graph cache at ``path``."""
     if path.exists() and not force:
         return load_graph(path)
     graph = from_database()

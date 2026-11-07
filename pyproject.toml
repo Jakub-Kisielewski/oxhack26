@@ -71,7 +71,7 @@ select = [
     "D",
 ]
 
-# Temporary suppressions: see docs/phase2.md and docs/design-decisions.md.
+# Temporary suppressions: see docs/design-decisions.md#lint-suppressions.
 [tool.ruff.lint.per-file-ignores]
 "src/ingestion/route_research/**" = [
     "E501",

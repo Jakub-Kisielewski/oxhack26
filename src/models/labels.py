@@ -11,6 +11,8 @@ from src.models.graph import MarchGraph
 
 @dataclass
 class TrainingEvent:
+    """One labelled march: snapped route, per-segment weights, and model context."""
+
     event_id: str
     date: str
     cause: str | None
@@ -24,6 +26,7 @@ class TrainingEvent:
 def read_events(
     g: MarchGraph, interpolated_weight: float = INTERPOLATED_WEIGHT
 ) -> list[TrainingEvent]:
+    """Load protest events from DuckDB and snap waypoints onto ``g``."""
     historic = mapdata.historical_events(protests_only=True)
     rows = (
         mapdata.cursor()
@@ -68,6 +71,7 @@ def read_events(
 
 
 def history_counts(events: list[TrainingEvent]) -> dict[str, int]:
+    """Count how many events used each segment (for the ``history`` feature)."""
     counts = Counter()
     for event in events:
         counts.update(set(event.route))  # one observation per event, not number of loops

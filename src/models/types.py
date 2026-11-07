@@ -6,12 +6,16 @@ from dataclasses import asdict, dataclass
 
 
 class _Serialisable:
+    """JSON-friendly ``dataclass`` mixin."""
+
     def to_dict(self) -> dict:
         return asdict(self)
 
 
 @dataclass
 class BacktestRow(_Serialisable):
+    """One backtest metric row for a single held-out event and model name."""
+
     event_id: str
     model: str
     mean_log_likelihood: float
@@ -21,6 +25,8 @@ class BacktestRow(_Serialisable):
 
 @dataclass
 class BacktestResult(_Serialisable):
+    """Aggregated leave-one-out backtest for the UI and ``backtest.json``."""
+
     rows: list[BacktestRow]
     summary: dict[str, dict[str, float]]
     n_events: int

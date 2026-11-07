@@ -25,3 +25,16 @@ Automating geocode approval would have allowed unverified coordinates into train
 ## Backtest thresholds
 
 Distance checks in backtest (for example 75 m / 250 m cutoffs and random-walk baseline weights) are documented inline in `src/models/backtest.py` rather than in user-facing UI.
+
+## Phase-2 scope cut
+
+Wikipedia pageviews (media salience) and UK calendar flags (bank holidays, Hijri months)
+were removed from ingestion: no feature in `src/models/features.py` reads them, and with
+65 seed events a calendar dummy has no support to fit. Crowd-capacity columns went the
+same way; see [crowd-density-note.md](crowd-density-note.md).
+
+## Lint suppressions
+
+Lint suppressions in `pyproject.toml` are scoped per package and tracked here. They
+cover formatting and complexity in `src/models` and `src/database`, which are not yet
+at the standard the crawler and route-research packages meet.

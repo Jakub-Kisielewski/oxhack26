@@ -9,6 +9,7 @@ from src.models.labels import TrainingEvent
 def candidates(
     cause: str | None, events: list[TrainingEvent], end=None, max_n: int = 5
 ) -> list[Destination]:
+    """Rank likely march end points from cause targets and training history."""
     if end is not None:
         return [Destination("Selected destination", tuple(end), 1.0)]
     raw = []

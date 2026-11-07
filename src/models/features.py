@@ -39,6 +39,11 @@ def feature_vector(
     history: dict | None = None,
     targets: list | None = None,
 ) -> np.ndarray:
+    """Return the 12-dimensional feature vector for moving from ``current`` to ``candidate``.
+
+    Features are aligned with ``NAMES`` (progress toward destination, width, interactions with
+    turnout/rain/darkness, legal zones, target pull, street history, etc.).
+    """
     context = context or {}
     history = history or {}
     targets = targets or []
