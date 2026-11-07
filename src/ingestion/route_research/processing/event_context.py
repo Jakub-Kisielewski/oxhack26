@@ -21,6 +21,9 @@ from zoneinfo import ZoneInfo
 from astral import LocationInfo
 from astral.sun import sun
 
+from src.ingestion.route_research.context import StepContext
+from src.ingestion.route_research.runner import run_cli_step
+
 LONDON = LocationInfo("London", "England", "Europe/London", 51.5074, -0.1278)
 TZ = ZoneInfo("Europe/London")
 DEFAULT_START = dt.time(12, 0)
@@ -137,13 +140,13 @@ def build_row(
     }
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--events", default="seed/events.csv")
     parser.add_argument("--weather", default="raw/weather/hourly.csv")
     parser.add_argument("--cause-column", default="cause")
     parser.add_argument("--output", default="normalised/event_context.csv")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     events = read_csv(Path(args.events))
     if events and args.cause_column not in events[0]:
         logger.info(
@@ -164,6 +167,10 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
     print(f"Saved context for {len(rows)} events to {output}")
+
+
+def run(context: StepContext, argv: list[str] | None = None) -> int:
+    return run_cli_step(main, context, argv)
 
 
 if __name__ == "__main__":

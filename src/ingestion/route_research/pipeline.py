@@ -1,4 +1,5 @@
 """Route research ingestion runner: `python -m src.ingestion.route_research.pipeline <step>`."""
+
 from __future__ import annotations
 
 import argparse
@@ -6,12 +7,13 @@ import shutil
 from pathlib import Path
 
 from src.ingestion.route_research import steps
+from src.ingestion.route_research.context import StepContext
 
 HERE = Path(__file__).resolve().parent
 PROJECT_ROOT = HERE.parents[2]
 DEFAULT_WORKSPACE = PROJECT_ROOT / "data" / "route_research"
 
-STEPS: dict[str, str] = dict(steps.RUNNERS)
+STEPS: dict[str, str] = {name: name for name in steps.REGISTRY}
 
 
 def initialise_workspace(target: Path) -> None:
@@ -26,7 +28,9 @@ def initialise_workspace(target: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--workdir", type=Path, default=DEFAULT_WORKSPACE)
     parser.add_argument("step", choices=["status", *STEPS])
     args, forwarded = parser.parse_known_args(argv)
@@ -35,10 +39,12 @@ def main(argv: list[str] | None = None) -> int:
     initialise_workspace(args.workdir)
     if args.step == "status":
         print(f"Workspace: {args.workdir.resolve()}")
-        print(f"Seed CSVs: {', '.join(sorted(p.name for p in (args.workdir / 'seed').glob('*.csv')))}")
+        print(
+            f"Seed CSVs: {', '.join(sorted(p.name for p in (args.workdir / 'seed').glob('*.csv')))}"
+        )
         print("Steps:", ", ".join(STEPS.keys()))
         return 0
-    context = steps.StepContext(args.workdir)
+    context = StepContext(args.workdir)
     return steps.run_named_step(args.step, context, forwarded)
 
 

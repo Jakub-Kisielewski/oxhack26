@@ -6,7 +6,7 @@
 
 ## Elevator pitch
 
-London has a large protest almost every weekend, yet the people affected plan around them with guesswork. Police often learn the route late, shopkeepers find out when the crowd arrives, and residents read about it afterwards. The London Protest Predictor joins OpenStreetMap, weather, Wikipedia salience, and hand-reviewed historical march plans on one street graph. It predicts the probability that a march passes every street in central London, its turnout, how long it lasts and where crowds will spill into side streets. It then turns those probabilities into decisions: where a shop should move its stock, and where a fixed number of police officers do the most good.
+London has a large protest almost every weekend, yet the people affected plan around them with guesswork. Police often learn the route late, shopkeepers find out when the crowd arrives, and residents read about it afterwards. The London Protest Predictor joins OpenStreetMap, Open-Meteo precipitation, and hand-reviewed historical march plans on one street graph. It predicts the probability that a march passes every street in central London, its turnout, how long it lasts and where crowds will spill into side streets. It then turns those probabilities into decisions: where a shop should move its stock, and where a fixed number of police officers do the most good.
 
 ## Inspiration
 
@@ -30,7 +30,7 @@ The app has five tools, each answering one question for one user.
 | Police placement | Where do N officers reduce the most risk? | Officer posts on the map and total spill risk before and after |
 | Model insights | How good is the model, and why did it predict this? | Backtest against baselines, the drivers of the latest prediction |
 
-Every prediction also shows a **Conditions & effects** panel. It lists what the model assumed about the day (weather, media attention, weekday, bank holiday, Ramadan, sunset) and what each factor changed. A rainy weekday march shows its turnout going down step by step; a march running into darkness shows its route leaning towards main, lit roads. Each effect is labelled **learned from past marches** or **hand-set assumption**, so users can see how far to trust it.
+When the full UI is enabled, predictions can show a **Conditions & effects** panel: precipitation in the first four hours and daylight after the march start (what the ingestion pipeline actually feeds the route model), plus labelled effects (**learned from past marches** vs **hand-set assumption**). Media salience and UK calendar flags were considered and dropped for lack of model consumers (see `docs/phase2.md`).
 
 ## The data
 
@@ -40,13 +40,12 @@ We built one pipeline (`python ingest.py`) that pulls every source, cleans it an
 | --- | --- | --- |
 | Published march plans (Met Police notices, Marble Arch security updates, organiser announcements) | Start, waypoints and end of past marches, geocoded and snapped to streets | The labels the route model learns from |
 | OpenStreetMap (via OSMnx) | Walk network and main roads inside TfL zones 1 to 2 | The streets a march can choose between |
-| Derived street features | Usable width, crowd capacity, betweenness centrality, junction degree, bridges | Wide, central streets attract big marches; narrow ones cause crush risk |
+| Derived street features | Usable width, main-network betweenness, junction degree, legal-zone flags | Wide, central streets attract big marches |
 | TfL station zones | Zones 1 to 2 boundary | Keeps the model to central London |
 | OSM and Wikidata | Embassies (with country), government buildings, monuments, squares and parks with area, shops, warehouses | Where each cause marches to, rally capacity, who is at risk, where stock can go |
 | Legal zones | No-entry sites, the Parliament Square controlled area, Royal Parks | Streets a march legally can't or rarely uses |
-| Open-Meteo | Hourly weather: forecast, recorded, or monthly average | Rain and cold reduce turnout; rain may change routes |
-| Wikipedia pageviews | Daily views of each cause's articles, before the march only | Media attention spikes predict bigger, more charged marches |
-| UK bank holidays, Hijri calendar, sunset times | Weekday, holiday, Ramadan, daylight after the start | Turnout and darkness effects |
+| Open-Meteo | Hourly precipitation (archive + forecast) | `precip_mm_4h` for rain × main road (feature 11) |
+| Derived context | Cause keywords, daylight after start (`astral`) | Cause → targets; `daylight_after_start_h` for darkness × main (feature 12) |
 No single source can predict a route. The value comes from joining them on one street graph: a march plan becomes a sequence of street choices, and every choice can be explained by the street's width, the cause's targets, the weather and the day.
 
 ## How we predict
@@ -57,8 +56,8 @@ A march is modelled as a walk through the street network: at every junction it p
 2. **Street probabilities: an absorbing Markov chain.** The learned turn probabilities form a transition matrix. One sparse linear solve gives the expected number of visits to every street, not a single route. That is the heatmap.
 3. **Top routes: Yen's k-shortest paths** on −log(probability), so the top routes are the likeliest paths, each with its share.
 4. **Destinations:** candidate end points come from past marches for the same cause and the cause's targets (an embassy, Parliament, Downing Street), weighted by how often they were used.
-5. **Turnout:** the median of past marches for the cause, scaled by media attention, rain, cold or heat, a weekday daytime start and bank holidays.
-6. **Overspill:** crowd physics. Density on each street = crowd size against street width as the march moves at about 2.5 km/h. Fruin's levels of service (A to F) mark crush risk, and side streets get a spill probability from density, junction degree and nearby targets, raised by a rowdiness score.
+5. **Turnout:** the median of past marches for the cause (user scope may simplify condition scaling in the demo app).
+6. **Overspill:** (removed from this repo's scope; crowd-capacity columns were cut from ingestion — see `docs/crowd-density-note.md`).
 
 $$
 P(b \mid a) = \frac{\exp(\theta^\top x(a,b,c,d))}{\sum_{b' \in N(a)} \exp(\theta^\top x(a,b',c,d))}
@@ -95,10 +94,10 @@ If the route model doesn't beat shortest path, training prints a warning not to 
 
 ## Why this is the best use of data for prediction and decision making
 
-1. **It fuses sources nobody joins.** March plans, a street graph, embassy locations, rally capacity, weather, Wikipedia attention, calendars and legal zones are each public. Nobody had put them on one street graph and asked one question of them.
+1. **It fuses sources nobody joins.** March plans, a street graph, embassy locations, precipitation, and legal zones are each public. Nobody had put them on one street graph and asked one question of them.
 2. **It predicts distributions, not guesses.** Every street gets a probability and every route a share. A shopkeeper on a 15% street and one on a 70% street get different advice, which a single predicted line can't give.
-3. **It explains itself.** Every prediction shows the weather it assumed, the media spike it measured, and what each factor did to turnout, route and rowdiness. Each effect is labelled learned or assumed, so users know how far to trust it.
-4. **It uses only information available before the march.** Media attention is measured before the march date, weather is the forecast for future dates, and the backtest hides each march from its own training.
+3. **It explains itself.** Predictions can show the precipitation and daylight the model assumed and what each factor did to the route choice. Each effect is labelled learned or assumed.
+4. **It uses only information available before the march.** Weather is archive or forecast by event date; the backtest hides each march from its own training (including the street-history feature).
 5. **It closes the loop to action.** Predictions feed an act-by time for a shop, ranked storage sites and an optimal police deployment with risk before and after. The output is a decision, not a chart.
 6. **It is tested against the alternative people already use.** The model is benchmarked against the shortest path a planner would assume, and the results, wins and losses, are shown in the app.
 7. **It is honest about its limits.** Training routes are published plans, not GPS traces, so the model predicts planned routes. Overspill has no recorded events to learn from, so it uses crowd physics with stated coefficients. The app says so on the page.
@@ -107,7 +106,7 @@ If the route model doesn't beat shortest path, training prints a warning not to 
 
 The system is five layers, and each one only reads from the layer above it.
 
-1. **Public data sources:** hand-curated march plans (seed), OpenStreetMap, TfL station zones (boundary only), Wikidata, Open-Meteo weather, Wikipedia pageviews, calendars.
+1. **Public data sources:** hand-curated march plans (seed), OpenStreetMap, TfL station zones (boundary only), Overpass landmarks, Open-Meteo precipitation.
 2. **Ingestion (`python ingest.py`):** download, geocode, snap routes to streets, derive street features, build the hexagon grid and per-march context.
 3. **DuckDB with the spatial extension:** one database holding map, grid, events, routes and context tables, with distances measured in British National Grid metres.
 4. **Models:** conditional logit route choice, absorbing Markov chain, Yen top routes, turnout, crowd-physics overspill, shop and police decisions.

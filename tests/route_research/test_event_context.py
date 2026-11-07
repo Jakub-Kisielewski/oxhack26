@@ -1,4 +1,5 @@
 """Tests for event context derivation."""
+
 from __future__ import annotations
 
 import datetime as dt

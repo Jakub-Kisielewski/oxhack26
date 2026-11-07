@@ -35,7 +35,4 @@ def test_event_date_from_url() -> None:
 def test_event_window_boundaries(event_offset_days: int, expected: bool) -> None:
     now = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
     event = now + timedelta(days=event_offset_days)
-    assert (
-        is_within_event_window(event, now=now, days_back=7, days_ahead=3) is expected
-    )
-
+    assert is_within_event_window(event, now=now, days_back=7, days_ahead=3) is expected

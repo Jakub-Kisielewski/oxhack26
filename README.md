@@ -1,26 +1,28 @@
 # London Protest Predictor
 
+[![tests](https://github.com/crislu05/london-protest-predictor/actions/workflows/test.yml/badge.svg)](https://github.com/crislu05/london-protest-predictor/actions/workflows/test.yml)
+
 ## HOW TO SETUP
 
 Run these steps in order from the repo root.
 
 | Step | Command | How often |
 |---|---|---|
-| 1. Python environment | `python3.12 -m venv .venv`, activate, `pip install -r requirements.txt` | once |
+| 1. Python environment | `python3.12 -m venv .venv`, activate, `pip install -e ".[dev]"` | once |
 | 2. Optional credentials | none required for the default build | — |
 | 3. All ingestion + database | `python ingest.py` (with the app closed) | whenever you want fresh data |
 | 4. Train the route model | `python -m src.models.train` | after each ingestion |
-| 5. Check model and UI agree | `python -m src.contract.selftest` | after training, before pushing |
+| 5. Tests | `pytest -q` | before pushing |
 | 6. App | `streamlit run app.py` | |
 
 Quick version, from a fresh clone:
 
 ```bash
 python3.12 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 python ingest.py                     # data -> data/protest.duckdb
 python -m src.models.train           # model -> data/models/
-python -m src.contract.selftest      # should print PASS for mock and real
+pytest -q
 streamlit run app.py
 ```
 
@@ -30,7 +32,7 @@ The repo pins Python 3.12 (`.python-version`).
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 DuckDB's spatial extension comes with `pip install` (the `duckdb-extension-spatial` package) and is installed automatically the first time the database is opened. **Intel Macs** have no wheel for it: see [Spatial extension on Intel Macs](#spatial-extension-on-intel-macs).
@@ -74,34 +76,29 @@ python ingest.py --refresh osm                # re-download just one of them
 ```bash
 python -m src.models.train           # full leave-one-event-out backtest
 python -m src.models.train --quick   # 5-event smoke test while developing (don't report its numbers)
-python -m src.models.checks          # optional sanity checks on the trained model
 ```
 Training reads `data/protest.duckdb` read-only and writes `data/models/graph.pkl`, `route_model.json` and
 `backtest.json`. It prints the backtest against the shortest-path and random-walk baselines, and warns if the
 route model doesn't beat shortest path. Re-train after every ingestion. Add `--force-graph` to rebuild the
 street graph. See `src/models/README.md`.
 
-### 4. Check the model and UI agree
+### 4. Run tests
 ```bash
-python -m src.contract.selftest                    # mock and (if trained) real predictor
-python -m src.contract.selftest --predictor real   # just the trained model
+pytest -q
+pytest --cov=src --cov-report=term-missing   # optional local coverage
 ```
-Runs every model method through the shared contract (`src/contract/`) and checks types, probability ranges,
-coordinate order and sorting. Both should print `PASS`. Run it before every push.
+The same suite runs in CI on every push and pull request.
 
 ### 5. Run the app
 ```bash
 streamlit run app.py
 ```
-- The app uses the trained model automatically when `data/models/` exists, otherwise a **mock predictor**
-  (a yellow banner says so). Force one with `PREDICTOR=mock` or `PREDICTOR=real`.
-- Trained a model while the app was running? Press **Reload model** on the dashboard.
-- The dashboard's **Data status** table shows what was loaded and when.
-- **Maps blank?** The map views need WebGL. If the browser console says `Failed to create WebGL context`,
-  turn on graphics acceleration (Chrome: Settings → System → *Use graphics acceleration when available*,
-  then restart; check `chrome://gpu`). If your GPU is blocklisted, enable `chrome://flags/#ignore-gpu-blocklist`,
-  or try Firefox.
+- The app shows **leave-one-event-out backtest** charts from `data/models/backtest.json` after training.
 - Close the app before re-running `python ingest.py`: it holds the database open.
+
+## Licence
+
+Released under the [MIT License](LICENSE).
 
 ### Database
 
@@ -109,27 +106,23 @@ streamlit run app.py
 
 | Group | Tables |
 |---|---|
-| Map | `boundary`, `segments` (walk network with `n_published_route_examples` and `edge_features`: `width_m`, `betweenness_main`, `to_degree`, `is_main`, `in_*_zone`), `main_edges`, `targets` (embassies have an ISO `country` code), `legal_zones` (no-entry sites, Parliament Square controlled area, Royal Parks from seed + OSM) |
-| Grid | `grid_cells` (~200 m hexagons), `grid_adjacency` (neighbouring cells), `segment_cells` (which cells each street crosses) |
+| Map | `boundary`, `segments` (walk network with `n_published_route_examples` and `edge_features`: `width_m`, `betweenness_main`, `to_degree`, `is_main`, `in_*_zone`), `targets` (embassies have an ISO `country` code), `legal_zones` (no-entry sites, Parliament Square controlled area, Royal Parks from seed + OSM) |
 | Events and routes | `events`, `waypoints`, `route_segments` (ordered `segment_id`s per `event_id`), `event_context`, `cause_targets` |
-| Context | (weather and pageview tables removed; files under `raw/weather/` and landmarks parquet are read by pipeline steps) |
 | Bookkeeping | `load_log` (rows and load time per table) |
 
 Geometry columns are lon/lat (EPSG:4326): `geom` on point and street tables, `geometry` on landmark layers. Use the `meters(a, b)` macro for distances; it works for points, lines and polygons. Don't use `ST_Distance_Sphere` directly: it expects lat/lon axis order.
 
 ```python
 from src.database.db import get_connection
+
 con = get_connection(read_only=True)
 
-# Pin query: nearest street segment to a clicked point
-con.execute("""SELECT segment_id, street_name, meters(geom, ST_Point(?, ?)) AS m
-               FROM segments ORDER BY m LIMIT 1""", [lon, lat]).df()
-
-# Shops within 100 m of a historical route
-con.execute("""SELECT DISTINCT s.name, s.shop FROM route_segments r
-               JOIN segments g USING (segment_id)
-               JOIN shops s ON meters(s.geometry, g.geom) < 100
-               WHERE r.event_id = ?""", ["2023-10-21-psc"]).df()
+# Nearest street segment to a point
+con.execute(
+    """SELECT segment_id, street_name, meters(geom, ST_Point(?, ?)) AS m
+               FROM segments ORDER BY m LIMIT 1""",
+    [lon, lat],
+).df()
 ```
 
 ### Spatial extension on Intel Macs
@@ -174,12 +167,9 @@ The `src/ingestion/route_research/` pipeline downloads additional geographic, hi
 
 - **OpenStreetMap Overpass (via OSMnx) — Embassies, government buildings, landmarks, squares, parks, shops, warehouses:** https://overpass-api.de/
 
-- **Open-Meteo — Historical and forecast hourly weather (no key):** https://open-meteo.com/en/docs/historical-weather-api
+- **Open-Meteo — Historical and forecast hourly precipitation (no key):** https://open-meteo.com/en/docs/historical-weather-api
 
-- **Wikimedia Pageviews API — Daily Wikipedia views per protest cause (media salience):** https://wikimedia.org/api/rest_v1/  
-  Documentation: https://doc.wikimedia.org/generated-data-platform/aqs/analytics-api/
-
-- **GOV.UK — UK bank holidays:** https://www.gov.uk/bank-holidays.json
+**Out of scope after the phase-2 cut:** Wikipedia pageviews (media salience) and UK bank-holiday / Hijri calendar flags were removed from ingestion because nothing in the route model reads them; see [docs/phase2.md](docs/phase2.md).
 
 These sources provide street geometry, protest-event locations, transport conditions and urban characteristics. They do not directly provide historical sequences of crowd movement.
 
@@ -260,9 +250,15 @@ Sources may change or become unavailable over time. Their reuse and redistributi
 The crawler is **not** a step in `python ingest.py`. It proposes new marches for human review:
 
 ```bash
-pip install -e .
+pip install -e ".[dev]"
 lpp-ingest --output-dir data    # writes data/candidates.csv
 lpp-ingest --list-platforms     # met_police, marble_arch_security, psc
+```
+
+### Development (optional)
+
+```bash
+pre-commit install   # runs ruff check/format before each commit
 ```
 
 Promote selected rows into `src/ingestion/route_research/seed/events.csv` and `waypoints.csv`, then run the normal build.

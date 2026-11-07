@@ -20,6 +20,8 @@ from pathlib import Path
 import requests
 
 from src.config import LONDON_LAT, LONDON_LON, OPEN_METEO_ARCHIVE, OPEN_METEO_FORECAST
+from src.ingestion.route_research.context import StepContext
+from src.ingestion.route_research.runner import run_cli_step
 
 LAT, LON = LONDON_LAT, LONDON_LON
 ARCHIVE_URL = OPEN_METEO_ARCHIVE
@@ -91,13 +93,13 @@ def hourly_rows(payload, source):
     ]
 
 
-def main():
+def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--events", default="seed/events.csv")
     p.add_argument("--start", type=dt.date.fromisoformat)
     p.add_argument("--end", type=dt.date.fromisoformat)
     p.add_argument("--output", default="raw/weather/hourly.csv")
-    a = p.parse_args()
+    a = p.parse_args(argv)
     today = dt.date.today()
     if a.start and a.end:
         ranges = [[a.start, a.end]]
@@ -122,6 +124,10 @@ def main():
         w.writeheader()
         w.writerows(rows)
     print(f"Saved {len(rows)} hourly rows to {out}")
+
+
+def run(context: StepContext, argv: list[str] | None = None) -> int:
+    return run_cli_step(main, context, argv)
 
 
 if __name__ == "__main__":

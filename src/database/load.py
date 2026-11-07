@@ -1,4 +1,5 @@
 """Load ingestion outputs into DuckDB: `python -m src.database.load`."""
+
 from __future__ import annotations
 
 import argparse
@@ -48,12 +49,18 @@ def fix_wkb_geometry(con, table: str) -> None:
         f"SELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table}'"
     ).fetchall():
         if name == "geometry" and dtype == "BLOB":
-            con.execute(f"ALTER TABLE {table} ALTER geometry TYPE GEOMETRY USING ST_GeomFromWKB(geometry)")
+            con.execute(
+                f"ALTER TABLE {table} ALTER geometry TYPE GEOMETRY USING ST_GeomFromWKB(geometry)"
+            )
 
 
 def segments_sql(route_dir: Path) -> str | None:
     norm = route_dir / "normalised"
-    geo, counts, feats = norm / "segments.geojson", norm / "segment_features.csv", norm / "edge_features.csv"
+    geo, counts, feats = (
+        norm / "segments.geojson",
+        norm / "segment_features.csv",
+        norm / "edge_features.csv",
+    )
     if not geo.exists():
         return None
     select, joins = ["g.*"], []
@@ -103,7 +110,9 @@ def derive(con, route_dir: Path) -> dict[str, str]:
             FROM read_parquet({quote(open_spaces)})
             WHERE COALESCE(TRY_CAST(royal_park AS BOOLEAN), false)
               AND ST_GeometryType(geometry) IN ('POLYGON', 'MULTIPOLYGON')""")
-        n = con.execute("SELECT COUNT(*) FROM legal_zones WHERE rule_type = 'royal_park'").fetchone()[0]
+        n = con.execute(
+            "SELECT COUNT(*) FROM legal_zones WHERE rule_type = 'royal_park'"
+        ).fetchone()[0]
         status["legal_zones.royal_parks"] = f"{n:,} Royal Park polygons added"
     return status
 
@@ -134,7 +143,9 @@ def load(con, route_dir: Path) -> dict[str, str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument("--db", type=Path, default=DB_PATH)
     p.add_argument("--route-dir", type=Path, default=ROUTE_RESEARCH_DIR)
     a = p.parse_args(argv)

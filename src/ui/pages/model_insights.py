@@ -35,7 +35,8 @@ else:
 st.subheader("What the model can and can't claim")
 st.markdown(
     """
-- **Training data are planned routes.** Past marches are published itineraries joined by shortest paths.
+- **Training data are planned routes.** Past marches are published itineraries joined by
+  shortest paths.
 - **Small sample.** Leave-one-event-out scores are honest but noisy with few labelled events.
 - **No live prediction UI.** This app only visualises the saved backtest summary.
 """

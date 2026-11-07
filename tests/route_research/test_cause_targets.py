@@ -1,4 +1,5 @@
 """Tests for cause target location and hit rates."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -17,15 +18,21 @@ def test_hit_rates_empty_targets() -> None:
 
 
 def test_locate_uses_reviewed_geocode() -> None:
-    row = type("Row", (), {"waypoint_name": "Trafalgar Square", "kind": "", "lat": 0.0, "lon": 0.0, "iso2": ""})()
+    row = type(
+        "Row",
+        (),
+        {"waypoint_name": "Trafalgar Square", "kind": "", "lat": 0.0, "lon": 0.0, "iso2": ""},
+    )()
     geocodes = {"Trafalgar Square": (51.5074, -0.1278)}
-    lat, lon, source = ct.locate(row, geocodes, pd.DataFrame())
+    lat, _lon, source = ct.locate(row, geocodes, pd.DataFrame())
     assert source == "reviewed_geocode"
     assert lat == 51.5074
 
 
 def test_empty_targets_zip_does_not_crash() -> None:
-    targets = pd.DataFrame(columns=["cause", "target_name", "lat", "lon", "weight", "waypoint_name", "kind", "iso2"])
+    targets = pd.DataFrame(
+        columns=["cause", "target_name", "lat", "lon", "weight", "waypoint_name", "kind", "iso2"]
+    )
     located: list[tuple[float, float, str]] = []
     targets["lat"], targets["lon"], targets["location_source"] = [], [], []
     assert len(located) == 0

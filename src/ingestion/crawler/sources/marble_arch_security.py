@@ -84,7 +84,7 @@ def _marble_turnout(body: str) -> int | None:
     return turnout_estimate_from_text(body)
 
 
-def _is_protest_entry(title: str, body: str) -> bool:  # noqa: C901
+def _is_protest_entry(title: str, body: str) -> bool:
     if _SKIP_TITLE.search(title):
         return False
     if _NON_PROTEST_EVENT.search(title):
@@ -113,8 +113,7 @@ def _is_protest_entry(title: str, body: str) -> bool:  # noqa: C901
         return True
 
     return bool(
-        has_primary_protest_language(title, body)
-        and _TITLE_PROTEST.search(f"{title} {body[:200]}")
+        has_primary_protest_language(title, body) and _TITLE_PROTEST.search(f"{title} {body[:200]}")
     )
 
 

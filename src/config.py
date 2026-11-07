@@ -1,4 +1,8 @@
-"""Named paths and constants for the training pipeline. Secrets via environment (see .env.example)."""
+"""Paths and constants for the training pipeline.
+
+Secrets come from the environment; see `.env.example`.
+"""
+
 from __future__ import annotations
 
 import os

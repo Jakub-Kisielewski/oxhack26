@@ -1,4 +1,5 @@
 """Unit tests for edge feature helpers and main-network betweenness."""
+
 from __future__ import annotations
 
 import networkx as nx
@@ -75,7 +76,10 @@ def test_betweenness_uses_one_estimator_on_one_graph(monkeypatch) -> None:
         }
     )
 
-    monkeypatch.setattr("src.ingestion.route_research.processing.edge_features.ox.graph_to_gdfs", lambda *a, **k: edges)
+    monkeypatch.setattr(
+        "src.ingestion.route_research.processing.edge_features.ox.graph_to_gdfs",
+        lambda *a, **k: edges,
+    )
     missing = __import__("pathlib").Path("nope")
     out = ef.build(walk, main, missing, missing)
     assert "betweenness_walk" not in out.columns

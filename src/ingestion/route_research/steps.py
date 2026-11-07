@@ -1,75 +1,34 @@
-"""Importable route-research pipeline steps (no subprocess)."""
+"""Registry of in-process route-research pipeline steps."""
+
 from __future__ import annotations
 
-import os
-import sys
-from dataclasses import dataclass
-from importlib import import_module
-from pathlib import Path
-from typing import Protocol
+from collections.abc import Callable
 
-RUNNERS: dict[str, str] = {
-    "boundary": "src.ingestion.route_research.sources.download_boundary",
-    "osm": "src.ingestion.route_research.sources.download_osm",
-    "landmarks": "src.ingestion.route_research.sources.download_landmarks",
-    "weather": "src.ingestion.route_research.sources.download_weather",
-    "seed-coords": "src.ingestion.route_research.processing.seed_coordinates",
-    "normalize": "src.ingestion.route_research.processing.normalize",
-    "edge-features": "src.ingestion.route_research.processing.edge_features",
-    "event-context": "src.ingestion.route_research.processing.event_context",
-    "cause-targets": "src.ingestion.route_research.processing.cause_targets",
+from src.ingestion.route_research.context import StepContext
+from src.ingestion.route_research.processing.cause_targets import run as run_cause_targets
+from src.ingestion.route_research.processing.edge_features import run as run_edge_features
+from src.ingestion.route_research.processing.event_context import run as run_event_context
+from src.ingestion.route_research.processing.normalize import run as run_normalize
+from src.ingestion.route_research.processing.seed_coordinates import run as run_seed_coords
+from src.ingestion.route_research.sources.download_boundary import run as run_boundary
+from src.ingestion.route_research.sources.download_landmarks import run as run_landmarks
+from src.ingestion.route_research.sources.download_osm import run as run_osm
+from src.ingestion.route_research.sources.download_weather import run as run_weather
+
+StepRun = Callable[[StepContext, list[str]], int]
+
+REGISTRY: dict[str, StepRun] = {
+    "boundary": run_boundary,
+    "osm": run_osm,
+    "landmarks": run_landmarks,
+    "weather": run_weather,
+    "seed-coords": run_seed_coords,
+    "normalize": run_normalize,
+    "edge-features": run_edge_features,
+    "event-context": run_event_context,
+    "cause-targets": run_cause_targets,
 }
 
 
-@dataclass(frozen=True)
-class StepContext:
-    """Resolved directories for one pipeline run."""
-
-    workdir: Path
-
-    @property
-    def raw(self) -> Path:
-        return self.workdir / "raw"
-
-    @property
-    def normalised(self) -> Path:
-        return self.workdir / "normalised"
-
-
-@dataclass(frozen=True)
-class StepResult:
-    """What a step produced, for run summaries."""
-
-    name: str
-    outputs: tuple[Path, ...]
-    rows_written: int
-    warnings: tuple[str, ...] = ()
-
-
-class PipelineStep(Protocol):
-    name: str
-    requires: tuple[str, ...]
-
-    def run(self, context: StepContext) -> StepResult: ...
-
-
-def run_module_main(module: str, workdir: Path, argv: list[str]) -> int:
-    """Run a step's ``main()`` with ``workdir`` as cwd and optional extra CLI args."""
-    prev_cwd = os.getcwd()
-    prev_argv = sys.argv[:]
-    os.chdir(workdir)
-    sys.argv = [module, *argv]
-    try:
-        import_module(module).main()
-        return 0
-    except SystemExit as exc:
-        code = exc.code
-        return int(code) if isinstance(code, int) else 1
-    finally:
-        os.chdir(prev_cwd)
-        sys.argv = prev_argv
-
-
 def run_named_step(name: str, context: StepContext, argv: list[str] | None = None) -> int:
-    module = RUNNERS[name]
-    return run_module_main(module, context.workdir, argv or [])
+    return REGISTRY[name](context, argv or [])

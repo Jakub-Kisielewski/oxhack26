@@ -1,4 +1,5 @@
 """Tests for normalize helpers and temporal history counts."""
+
 from __future__ import annotations
 
 import inspect

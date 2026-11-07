@@ -164,5 +164,3 @@ EVENT_SLUG_RE = re.compile(r"/events/([a-z0-9][a-z0-9-]{2,})/?", re.I)
 def event_slug_pattern(prefix: str) -> re.Pattern[str]:
     segment = prefix.strip("/")
     return re.compile(rf"/{re.escape(segment)}/([a-z0-9][a-z0-9-]{{2,}})/?", re.I)
-
-

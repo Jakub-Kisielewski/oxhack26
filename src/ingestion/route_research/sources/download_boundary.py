@@ -23,6 +23,8 @@ import shapely
 from shapely.geometry import MultiPoint
 
 from src.config import BOUNDARY_BUFFER_M, BOUNDARY_HULL_RATIO, TFL_API_BASE
+from src.ingestion.route_research.context import StepContext
+from src.ingestion.route_research.runner import run_cli_step
 
 BASE = TFL_API_BASE
 MODES = "tube,dlr,overground,elizabeth-line"
@@ -94,7 +96,7 @@ def build_polygon(rows, buffer_m, ratio):
     return gpd.GeoSeries([hull.buffer(buffer_m)], crs="EPSG:27700").to_crs("EPSG:4326").iloc[0]
 
 
-def main():
+def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--outdir", default="raw/boundary")
     p.add_argument(
@@ -106,7 +108,7 @@ def main():
         default=BOUNDARY_HULL_RATIO,
         help="shapely concave_hull ratio (1 = convex hull)",
     )
-    a = p.parse_args()
+    a = p.parse_args(argv)
     out = Path(a.outdir)
     out.mkdir(parents=True, exist_ok=True)
     params = {}
@@ -132,6 +134,10 @@ def main():
     gdf.to_file(out / "zones_1_2.geojson", driver="GeoJSON")
     area_km2 = gdf.to_crs("EPSG:27700").area.iloc[0] / 1e6
     print(f"{len(rows)} zone 1-2 stations -> polygon of {area_km2:.1f} km2; saved {out}")
+
+
+def run(context: StepContext, argv: list[str] | None = None) -> int:
+    return run_cli_step(main, context, argv)
 
 
 if __name__ == "__main__":

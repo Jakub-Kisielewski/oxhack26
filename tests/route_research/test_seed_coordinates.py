@@ -1,4 +1,5 @@
 """Tests for coordinate review rows."""
+
 from __future__ import annotations
 
 from src.ingestion.route_research.processing.seed_coordinates import review_rows

@@ -1,4 +1,5 @@
 """Regression tests for phase-2 defects."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -16,11 +17,15 @@ def test_download_osm_invalid_bbox_raises(monkeypatch) -> None:
         # main() parses argv; call inline check instead
         west, east, south, north = 1.0, 0.0, 51.0, 52.0
         if west >= east or south >= north:
-            raise ValueError(f"Invalid bbox: west={west}, east={east}, south={south}, north={north}")
+            raise ValueError(
+                f"Invalid bbox: west={west}, east={east}, south={south}, north={north}"
+            )
 
 
 def test_cause_targets_empty_dataframe_columns() -> None:
-    targets = pd.DataFrame(columns=["cause", "target_name", "lat", "lon", "weight", "waypoint_name", "kind", "iso2"])
+    targets = pd.DataFrame(
+        columns=["cause", "target_name", "lat", "lon", "weight", "waypoint_name", "kind", "iso2"]
+    )
     located: list[tuple[float, float, str]] = []
     targets["lat"], targets["lon"], targets["location_source"] = [], [], []
     assert list(targets.columns) == [

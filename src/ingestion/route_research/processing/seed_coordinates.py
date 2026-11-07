@@ -16,6 +16,8 @@ import json
 from pathlib import Path
 
 from src.ingestion.route_research.constants import PACKAGE_SEED
+from src.ingestion.route_research.context import StepContext
+from src.ingestion.route_research.runner import run_cli_step
 
 FIELDS = ["waypoint_name", "latitude", "longitude", "status", "geocoded_display_name", "notes"]
 
@@ -71,13 +73,13 @@ def review_rows(labels, cache, overrides):
     return rows
 
 
-def main():
+def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--waypoints", default="seed/waypoints.csv")
     p.add_argument("--cache", default=str(PACKAGE_SEED / "geocode_cache.json"))
     p.add_argument("--overrides", default=str(PACKAGE_SEED / "waypoint_geocode_overrides.json"))
     p.add_argument("--output", default="coordinate_review.csv")
-    a = p.parse_args()
+    a = p.parse_args(argv)
     with open(a.waypoints, encoding="utf-8-sig") as f:
         labels = sorted({r["waypoint_name"] for r in csv.DictReader(f) if r.get("waypoint_name")})
     rows = review_rows(labels, load_json(a.cache), load_json(a.overrides))
@@ -91,6 +93,10 @@ def main():
     )
     if missing:
         print(f"WARNING: no coordinates for {len(missing)}: {', '.join(missing)}")
+
+
+def run(context: StepContext, argv: list[str] | None = None) -> int:
+    return run_cli_step(main, context, argv)
 
 
 if __name__ == "__main__":

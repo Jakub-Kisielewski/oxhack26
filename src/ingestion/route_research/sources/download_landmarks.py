@@ -28,6 +28,8 @@ from osmnx._errors import InsufficientResponseError
 
 METRIC_CRS = "EPSG:27700"
 from src.config import OVERPASS_URLS
+from src.ingestion.route_research.context import StepContext
+from src.ingestion.route_research.runner import run_cli_step
 
 BACKOFF_S = [0, 30, 60, 120]  # wait before each round over all servers
 
@@ -149,13 +151,13 @@ def save(gdf, out, layer):
     print(f"{layer}: {len(gdf):,} features")
 
 
-def main():
+def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--boundary", default="raw/boundary/zones_1_2.geojson")
     p.add_argument("--outdir", default="raw/landmarks")
     p.add_argument("--layers", nargs="+", choices=list(LAYERS), default=list(LAYERS))
     p.add_argument("--refresh", action="store_true", help="Re-download layers that already exist")
-    a = p.parse_args()
+    a = p.parse_args(argv)
     if not Path(a.boundary).exists():
         raise SystemExit(f"{a.boundary} missing: run the `boundary` step first")
     out = Path(a.outdir)
@@ -192,6 +194,10 @@ def main():
         save(gdf, out, layer)
     if failed:
         raise SystemExit(f"Failed layers: {', '.join(failed)}; re-run to fetch just those")
+
+
+def run(context: StepContext, argv: list[str] | None = None) -> int:
+    return run_cli_step(main, context, argv)
 
 
 if __name__ == "__main__":

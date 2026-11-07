@@ -31,6 +31,8 @@ import osmnx as ox
 import pandas as pd
 
 from src.config import LEGAL_ZONES_PATH
+from src.ingestion.route_research.context import StepContext
+from src.ingestion.route_research.runner import run_cli_step
 
 LANE_M, PAVEMENTS_M = 3.25, 5.0
 CARRIAGEWAYS = {
@@ -206,14 +208,14 @@ def build(
     return out
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--walk", default="raw/osm/london_walk.graphml")
     parser.add_argument("--main", default="raw/osm/london_main.graphml")
     parser.add_argument("--legal-zones", default=str(LEGAL_ZONES_PATH))
     parser.add_argument("--open-spaces", default="raw/landmarks/open_spaces.geoparquet")
     parser.add_argument("--output", default="normalised/edge_features.csv")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     walk = ox.load_graphml(args.walk)
     main_graph = ox.load_graphml(args.main) if Path(args.main).exists() else None
     out = build(walk, main_graph, Path(args.legal_zones), Path(args.open_spaces))
@@ -224,6 +226,10 @@ def main() -> None:
         f"{len(out):,} segments -> {output}; "
         f"{out.in_no_entry_zone.sum()} in no-entry zones, {out.in_royal_park.sum()} in Royal Parks"
     )
+
+
+def run(context: StepContext, argv: list[str] | None = None) -> int:
+    return run_cli_step(main, context, argv)
 
 
 if __name__ == "__main__":

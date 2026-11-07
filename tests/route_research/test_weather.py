@@ -1,4 +1,5 @@
 """Tests for Open-Meteo date merging."""
+
 from __future__ import annotations
 
 import datetime as dt

@@ -34,6 +34,8 @@ from src.config import (
     LONDON_LON_MIN,
     MAX_SNAP_DISTANCE_M,
 )
+from src.ingestion.route_research.context import StepContext
+from src.ingestion.route_research.runner import run_cli_step
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +126,7 @@ def make_streets(graph: nx.MultiDiGraph, out: Path) -> pd.DataFrame:
     return frame
 
 
-def join_waypoints(
+def join_waypoints(  # noqa: C901
     graph: nx.MultiDiGraph,
     events: pd.DataFrame,
     waypoints: pd.DataFrame,
@@ -260,7 +262,7 @@ def join_waypoints(
     return routes
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--graph", default="raw/osm/london_walk.graphml")
     parser.add_argument("--events", default="seed/events.csv")
@@ -268,7 +270,7 @@ def main() -> None:
     parser.add_argument("--review", default="coordinate_review.csv")
     parser.add_argument("--outdir", default="normalised")
     parser.add_argument("--max-snap-distance-m", type=float, default=MAX_SNAP_DISTANCE_M)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     out = Path(args.outdir)
     out.mkdir(parents=True, exist_ok=True)
     graph = ox.load_graphml(args.graph)
@@ -303,6 +305,10 @@ def main() -> None:
     logger.warning(
         "For backtesting, recompute historical counts using ONLY events before the test event date"
     )
+
+
+def run(context: StepContext, argv: list[str] | None = None) -> int:
+    return run_cli_step(main, context, argv)
 
 
 if __name__ == "__main__":

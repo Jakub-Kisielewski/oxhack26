@@ -23,6 +23,8 @@ from pathlib import Path
 import pandas as pd
 
 from src.ingestion.route_research.constants import PACKAGE_SEED
+from src.ingestion.route_research.context import StepContext
+from src.ingestion.route_research.runner import run_cli_step
 
 MAX_MATCH_M = 400
 
@@ -104,7 +106,7 @@ def hit_rates(targets, event_causes, waypoints, radius_m):
     return rates, counts
 
 
-def main():
+def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--targets", default=str(PACKAGE_SEED / "cause_targets.csv"))
     p.add_argument("--event-context", default="normalised/event_context.csv")
@@ -116,7 +118,7 @@ def main():
     )
     p.add_argument("--hit-radius-m", type=float, default=250)
     p.add_argument("--output", default="normalised/cause_targets.csv")
-    a = p.parse_args()
+    a = p.parse_args(argv)
     targets = pd.read_csv(a.targets, keep_default_na=False).replace("", None)
     targets[["lat", "lon", "weight"]] = targets[["lat", "lon", "weight"]].astype(float)
     osm = read_layer(a.osm_targets, ["category", "country", "lat", "lon"])
@@ -159,6 +161,10 @@ def main():
             ]
         ].to_string(index=False)
     )
+
+
+def run(context: StepContext, argv: list[str] | None = None) -> int:
+    return run_cli_step(main, context, argv)
 
 
 if __name__ == "__main__":

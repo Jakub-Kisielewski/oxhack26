@@ -3,20 +3,28 @@
 
 Builds route research data under data/route_research/ and loads data/protest.duckdb.
 """
+
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
 
 from src.ingestion.route_research import pipeline as route_pipeline
 
 ROOT = Path(__file__).resolve().parent
 WORKDIR = route_pipeline.DEFAULT_WORKSPACE
+
+
+def _no_skip(_: argparse.Namespace) -> str | None:
+    return None
+
+
+def _no_extra_args(_: argparse.Namespace) -> list[str]:
+    return []
 
 
 @dataclass
@@ -25,8 +33,8 @@ class Step:
     description: str
     needs: list[str] = field(default_factory=list)
     outputs: list[str] = field(default_factory=list)
-    skip_reason: Callable[[argparse.Namespace], Optional[str]] = lambda a: None
-    args: Callable[[argparse.Namespace], list[str]] = lambda a: []
+    skip_reason: Callable[[argparse.Namespace], str | None] = _no_skip
+    args: Callable[[argparse.Namespace], list[str]] = _no_extra_args
     kind: str = "route"
 
 
@@ -95,7 +103,9 @@ def cached(step: Step, args) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     names = [s.name for s in STEPS]
     p.add_argument("--only", nargs="+", choices=names, metavar="STEP")
     p.add_argument("--skip", nargs="+", choices=names, default=[], metavar="STEP")
@@ -117,11 +127,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{s.name:<15} {s.description}{extra}")
         return 0
 
-    selected = [s for s in STEPS if (not args.only or s.name in args.only) and s.name not in args.skip]
+    selected = [
+        s for s in STEPS if (not args.only or s.name in args.only) and s.name not in args.skip
+    ]
     status: dict[str, str] = {}
     timings: dict[str, float] = {}
     for step in selected:
-        blocked = [n for n in step.needs if status.get(n, "ok").startswith(("FAILED", "skipped (needs"))]
+        blocked = [
+            n for n in step.needs if status.get(n, "ok").startswith(("FAILED", "skipped (needs"))
+        ]
         reason = step.skip_reason(args)
         if blocked:
             status[step.name] = f"skipped (needs {', '.join(blocked)})"

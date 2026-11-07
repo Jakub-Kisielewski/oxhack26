@@ -1,4 +1,5 @@
 """Rain feature support for rain_x_main (B-6)."""
+
 from __future__ import annotations
 
 import csv

@@ -54,7 +54,7 @@ class ProtestIngestionPipeline:
                 counts[platform_id] = len(records)
                 all_records.extend(records)
                 logger.info("source %s: %s candidates", platform_id, len(records))
-            except Exception as exc:  # noqa: BLE001 — one source must not abort the run
+            except Exception as exc:
                 logger.exception("platform %s failed", platform_id)
                 counts[platform_id] = 0
                 errors.append({"source": platform_id, "error": str(exc)})

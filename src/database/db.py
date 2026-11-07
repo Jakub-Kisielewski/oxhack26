@@ -9,7 +9,9 @@ def _install_spatial(con: duckdb.DuckDBPyConnection) -> None:
     try:
         import duckdb_extension_spatial
 
-        bundled = sorted(Path(duckdb_extension_spatial.__path__[0]).glob("extensions/*/spatial.duckdb_extension"))
+        bundled = sorted(
+            Path(duckdb_extension_spatial.__path__[0]).glob("extensions/*/spatial.duckdb_extension")
+        )
     except ImportError:
         bundled = []
     if bundled:

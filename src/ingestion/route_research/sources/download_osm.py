@@ -17,6 +17,9 @@ from pathlib import Path
 import geopandas as gpd
 import osmnx as ox
 
+from src.ingestion.route_research.context import StepContext
+from src.ingestion.route_research.runner import run_cli_step
+
 EXTRA_WAY_TAGS = ["lanes", "width", "bridge", "tunnel", "ref", "maxspeed", "junction"]
 EDGE_COLS = ["u", "v", "key", "length", "highway", "name", "oneway", *EXTRA_WAY_TAGS, "geometry"]
 MAIN_HIGHWAYS = {
@@ -65,7 +68,7 @@ def save_edges(graph, path):
     return len(edges)
 
 
-def main():
+def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser()
     p.add_argument(
         "--boundary",
@@ -77,7 +80,7 @@ def main():
     p.add_argument("--east", type=float, default=-0.07)
     p.add_argument("--north", type=float, default=51.54)
     p.add_argument("--outdir", default="raw/osm")
-    a = p.parse_args()
+    a = p.parse_args(argv)
     if a.west >= a.east or a.south >= a.north:
         raise ValueError(
             f"Invalid bbox: west={a.west}, east={a.east}, south={a.south}, north={a.north}"
@@ -106,6 +109,10 @@ def main():
     print(
         f"Main-road network: {len(main_graph.nodes):,} nodes, {n_main:,} directed edges; saved {dest}"
     )
+
+
+def run(context: StepContext, argv: list[str] | None = None) -> int:
+    return run_cli_step(main, context, argv)
 
 
 if __name__ == "__main__":
