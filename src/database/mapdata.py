@@ -205,10 +205,9 @@ def legal_zones() -> list[dict]:
 
 
 def targets(categories: list[str] | None = None) -> list[dict]:
+    country_sel = "country" if _has_column("targets", "country") else "NULL"
     sql = (
-        "SELECT name, category, "
-        + ("country" if _has_column("targets", "country") else "NULL")
-        + ", lon, lat FROM targets WHERE lat IS NOT NULL"
+        f"SELECT name, category, {country_sel}, lon, lat FROM targets WHERE lat IS NOT NULL"  # noqa: S608 — country_sel is country|NULL literal
     )
     params = []
     if categories:
@@ -303,7 +302,9 @@ def warehouses() -> list[dict]:
     fp = "footprint_m2" if _has_column("warehouses", "footprint_m2") else "NULL"
     rows = (
         cursor()
-        .execute(f"SELECT osm_id, name, lon, lat, {fp} FROM warehouses WHERE lat IS NOT NULL")
+        .execute(
+            f"SELECT osm_id, name, lon, lat, {fp} FROM warehouses WHERE lat IS NOT NULL"  # noqa: S608 — fp is footprint_m2|NULL literal
+        )
         .fetchall()
     )
     return [

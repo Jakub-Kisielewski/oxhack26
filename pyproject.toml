@@ -12,9 +12,9 @@ license = "MIT"
 license-files = ["LICENSE"]
 dependencies = [
     "requests>=2.31.0",
-    "urllib3>=2.0",
+    "urllib3>=2.0",  # imported directly in ingestion.crawler.client (Retry), not only via requests
     "pandas>=2.2.2",
-    "pyarrow>=15.0.0",
+    "pyarrow>=15.0.0",  # Parquet I/O for pandas/geopandas; no direct import in application code
     "duckdb==1.5.5",
     "duckdb-extension-spatial==1.5.5; sys_platform != 'darwin' or platform_machine != 'x86_64'",
     "geopandas>=1.0",
@@ -110,7 +110,7 @@ select = [
     "RUF005",
     "RUF059",
 ]
-"src/database/**" = ["E501", "DTZ005", "ANN", "D", "S608"]
+"src/database/**" = ["E501", "DTZ005", "ANN", "D"]
 "tests/crawler/**" = ["TRY003", "EM101", "ANN", "D"]
 "src/ui/**" = ["ANN", "D"]
 "ingest.py" = ["ANN", "D"]
