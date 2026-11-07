@@ -166,8 +166,3 @@ def event_slug_pattern(prefix: str) -> re.Pattern[str]:
     return re.compile(rf"/{re.escape(segment)}/([a-z0-9][a-z0-9-]{{2,}})/?", re.I)
 
 
-ACTIONNETWORK_EVENT_RE = re.compile(
-    r"actionnetwork\.org/(?:events|ticketed_events)/([a-z0-9_-]+)",
-    re.I,
-)
-AN_EVENT_QUERY_RE = re.compile(r"[?&]an_event=([a-f0-9-]{36})", re.I)

@@ -6,7 +6,7 @@ from typing import Final, TypedDict
 
 from ingestion.crawler.sources.marble_arch_security import MarbleArchSecuritySource
 from ingestion.crawler.sources.met_police import MetPoliceSource
-from ingestion.crawler.sources.organizers.sites import ORGANIZER_SITES
+from ingestion.crawler.sources.psc import PscSource
 
 
 class PlatformMeta(TypedDict):
@@ -17,25 +17,15 @@ class PlatformMeta(TypedDict):
 
 def build_platform_catalog() -> dict[str, PlatformMeta]:
     """Static metadata for every platform this project discovers."""
-    catalog: dict[str, PlatformMeta] = {
-        MetPoliceSource.platform_id: {
-            "platform_id": MetPoliceSource.platform_id,
-            "platform_name": MetPoliceSource.platform_name,
-            "platform_url": MetPoliceSource.platform_url,
-        },
-        MarbleArchSecuritySource.platform_id: {
-            "platform_id": MarbleArchSecuritySource.platform_id,
-            "platform_name": MarbleArchSecuritySource.platform_name,
-            "platform_url": MarbleArchSecuritySource.platform_url,
-        },
-    }
-    for site in ORGANIZER_SITES:
-        catalog[site.platform_id] = {
-            "platform_id": site.platform_id,
-            "platform_name": site.platform_name,
-            "platform_url": site.platform_url,
+    stubs = (MetPoliceSource, MarbleArchSecuritySource, PscSource)
+    return {
+        stub.platform_id: {
+            "platform_id": stub.platform_id,
+            "platform_name": stub.platform_name,
+            "platform_url": stub.platform_url,
         }
-    return catalog
+        for stub in stubs
+    }
 
 
 PLATFORM_CATALOG: Final = build_platform_catalog()

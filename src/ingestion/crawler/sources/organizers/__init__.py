@@ -1,4 +1,5 @@
-from ingestion.crawler.sources.organizers.crawler import OrganizerSiteSource
-from ingestion.crawler.sources.organizers.sites import ORGANIZER_SITES, OrganizerSiteConfig
+"""London protest heuristics and PSC page parsers (used by ``PscSource``)."""
 
-__all__ = ["OrganizerSiteSource", "OrganizerSiteConfig", "ORGANIZER_SITES"]
+from ingestion.crawler.sources.organizers.filters import is_london_protest_event
+
+__all__ = ["is_london_protest_event"]

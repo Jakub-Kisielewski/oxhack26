@@ -6,7 +6,7 @@
 
 ## Elevator pitch
 
-London has a large protest almost every weekend, yet the people affected plan around them with guesswork. Police often learn the route late, shopkeepers find out when the crowd arrives, and residents read about it afterwards. The London Protest Predictor fuses more than a dozen public data sources into one street-level model. It predicts the probability that a march passes every street in central London, its turnout, how long it lasts and where crowds will spill into side streets. It then turns those probabilities into decisions: where a shop should move its stock, and where a fixed number of police officers do the most good.
+London has a large protest almost every weekend, yet the people affected plan around them with guesswork. Police often learn the route late, shopkeepers find out when the crowd arrives, and residents read about it afterwards. The London Protest Predictor joins OpenStreetMap, weather, Wikipedia salience, and hand-reviewed historical march plans on one street graph. It predicts the probability that a march passes every street in central London, its turnout, how long it lasts and where crowds will spill into side streets. It then turns those probabilities into decisions: where a shop should move its stock, and where a fixed number of police officers do the most good.
 
 ## Inspiration
 
@@ -47,8 +47,6 @@ We built one pipeline (`python ingest.py`) that pulls every source, cleans it an
 | Open-Meteo | Hourly weather: forecast, recorded, or monthly average | Rain and cold reduce turnout; rain may change routes |
 | Wikipedia pageviews | Daily views of each cause's articles, before the march only | Media attention spikes predict bigger, more charged marches |
 | UK bank holidays, Hijri calendar, sunset times | Weekday, holiday, Ramadan, daylight after the start | Turnout and darkness effects |
-| Committed seed CSVs + Met / Marble Arch / organiser archives | Hand-reviewed historical routes and provenance URLs | Training labels and honest backtest scope (not live Police.uk or ACLED feeds) |
-
 No single source can predict a route. The value comes from joining them on one street graph: a march plan becomes a sequence of street choices, and every choice can be explained by the street's width, the cause's targets, the weather and the day.
 
 ## How we predict
