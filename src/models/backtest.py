@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Callable
+from functools import partial
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -175,19 +176,19 @@ def _model_rollout(
     return rollout_path(g, event.route[0], chosen_end, pick, _max_steps(event), net_dist)
 
 
+def _pick_uniform(_cur: str, options: list[str], generator: np.random.Generator) -> str:
+    return options[int(generator.integers(len(options)))]
+
+
 def _random_walk_jaccard(
     g: MarchGraph,
     event: TrainingEvent,
     chosen_end: tuple[float, float],
 ) -> float:
     scores = []
+    net_dist = g.network_distances_to(chosen_end)
     for seed in range(RANDOM_WALK_ROLLOUT_SEEDS):
-        rng = np.random.default_rng(seed)
-
-        def pick(_cur: str, options: list[str], _rng: np.random.Generator = rng) -> str:
-            return options[int(_rng.integers(len(options)))]
-
-        net_dist = g.network_distances_to(chosen_end)
+        pick = partial(_pick_uniform, generator=np.random.default_rng(seed))
         path = rollout_path(g, event.route[0], chosen_end, pick, _max_steps(event), net_dist)
         scores.append(jaccard(path, event.route))
     return sum(scores) / len(scores) if scores else float("nan")

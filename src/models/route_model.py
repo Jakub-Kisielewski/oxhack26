@@ -172,6 +172,10 @@ def fit(
     )
     loss = float(result.fun)
     fitted = bool(result.success and np.isfinite(loss))
+    moved = np.abs(result.x - prior) > 1e-6
+    prior_only = (
+        [] if not fitted else [name for name, ok in zip(NAMES, moved, strict=True) if not ok]
+    )
     return ChoiceModel(
         result.x.tolist(),
         means.tolist(),
@@ -184,7 +188,7 @@ def fit(
             "weighted_choices": float(w.sum()),
             "loss": loss,
             "converged": bool(result.success),
-            "prior_only": [] if fitted else list(NAMES),
+            "prior_only": prior_only,
             "reg": reg,
         },
     )

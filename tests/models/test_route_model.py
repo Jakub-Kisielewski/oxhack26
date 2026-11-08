@@ -67,3 +67,10 @@ def test_json_feature_mismatch_raises(tiny_graph, tiny_events) -> None:
 def test_fit_records_convergence(tiny_graph, tiny_events) -> None:
     model = fit(tiny_graph, tiny_events, maxiter=25)
     assert "converged" in model.stats
+
+
+def test_prior_only_lists_unmoved_coefficients(tiny_graph, tiny_events) -> None:
+    model = fit(tiny_graph, tiny_events, targets_for=lambda _: [], maxiter=5, reg=1e6)
+    assert model.fitted
+    assert isinstance(model.stats["prior_only"], list)
+    assert all(name in NAMES for name in model.stats["prior_only"])
