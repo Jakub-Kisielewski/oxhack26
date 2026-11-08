@@ -5,10 +5,10 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from src.models.features import NAMES
 from src.models.route_model import PRIOR, ChoiceModel, fit
-from tests.models.conftest import make_event
 
 
 def test_fit_recovers_dominant_sign(tiny_graph, tiny_events) -> None:
@@ -60,11 +60,8 @@ def test_json_feature_mismatch_raises(tiny_graph, tiny_events) -> None:
         data = json.loads(path.read_text())
         data["features"] = ["bogus"]
         path.write_text(json.dumps(data))
-        try:
+        with pytest.raises(ValueError):
             ChoiceModel.from_json(path)
-        except ValueError:
-            return
-        raise AssertionError("expected ValueError")
 
 
 def test_fit_records_convergence(tiny_graph, tiny_events) -> None:

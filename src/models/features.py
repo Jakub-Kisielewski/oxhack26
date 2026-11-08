@@ -6,7 +6,7 @@ import math
 
 import numpy as np
 
-from src.config import DEFAULT_TURNOUT, MARCH_HOURS, TARGET_PULL_LENGTH_M
+from src.config import MARCH_HOURS, TARGET_PULL_LENGTH_M
 from src.database import mapdata
 from src.models.graph import MarchGraph, angle
 
@@ -67,7 +67,8 @@ def feature_vector(
         progress = (da - db) / 1000.0
     else:
         progress = (
-            mapdata.distance_m(a.path[-1], destination) - mapdata.distance_m(b.path[-1], destination)
+            mapdata.distance_m(a.path[-1], destination)
+            - mapdata.distance_m(b.path[-1], destination)
         ) / 1000.0
     pull = sum(
         float(t.get("weight") or 0)

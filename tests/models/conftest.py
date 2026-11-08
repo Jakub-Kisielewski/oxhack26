@@ -50,7 +50,9 @@ def tiny_graph() -> MarchGraph:
     """Three segments: approach, straight ahead, and side branch at one junction."""
     s0 = _seg("s0", "n1", "n2", _pt(-0.12, 51.5), _pt(-0.11, 51.5))
     s1 = _seg("s1", "n2", "n3", _pt(-0.11, 51.5), _pt(-0.10, 51.5), name="High Street")
-    s2 = _seg("s2", "n2", "n4", _pt(-0.11, 51.5), _pt(-0.11, 51.51), name="Side Road", is_main=False)
+    s2 = _seg(
+        "s2", "n2", "n4", _pt(-0.11, 51.5), _pt(-0.11, 51.51), name="Side Road", is_main=False
+    )
     return MarchGraph({"s0": s0, "s1": s1, "s2": s2})
 
 
@@ -77,11 +79,11 @@ def make_event(
 def stub_cause_targets(monkeypatch):
     monkeypatch.setattr(
         "src.models.backtest.mapdata.cause_targets",
-        lambda cause=None: [],
+        lambda _cause=None: [],
     )
     monkeypatch.setattr(
         "src.models.destinations.mapdata.cause_targets",
-        lambda cause=None: [],
+        lambda _cause=None: [],
     )
 
 

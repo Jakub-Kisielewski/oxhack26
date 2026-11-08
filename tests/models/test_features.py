@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import math
 
-import numpy as np
-
 from src.models.features import NAMES, dark_fraction, feature_vector
-from tests.models.conftest import _pt, make_event
+from tests.models.conftest import _pt
 
 
 def test_feature_vector_length_and_order(tiny_graph) -> None:

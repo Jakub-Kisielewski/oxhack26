@@ -31,7 +31,8 @@ def candidates(
         if cause and e.cause != cause:
             continue
         if not any(
-            mapdata.distance_m(e.destination, p) < DESTINATION_HISTORICAL_RADIUS_M for _, p, _ in raw
+            mapdata.distance_m(e.destination, p) < DESTINATION_HISTORICAL_RADIUS_M
+            for _, p, _ in raw
         ):
             name = getattr(e, "destination_name", "")
             raw.append(
@@ -66,5 +67,6 @@ def destination_top3_hit(event: TrainingEvent, training: list[TrainingEvent]) ->
     """True when the realised end point is among the top three destination candidates."""
     dests = candidates(event.cause, training)
     return any(
-        mapdata.distance_m(d.lonlat, event.destination) < DESTINATION_HIT_RADIUS_M for d in dests[:3]
+        mapdata.distance_m(d.lonlat, event.destination) < DESTINATION_HIT_RADIUS_M
+        for d in dests[:3]
     )

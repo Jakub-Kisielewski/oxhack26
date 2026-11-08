@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import math
 
-import pytest
-
 from src.models.backtest import (
     baseline_ll,
     evaluate,
@@ -30,9 +28,7 @@ def test_baseline_epsilon_within_bounds(tiny_graph, tiny_events) -> None:
     eps = fit_baseline_epsilon(
         tiny_graph,
         tiny_events,
-        lambda e: tiny_graph.route_between(
-            tiny_graph.segments[e.route[0]].path[0], e.destination
-        ),
+        lambda e: tiny_graph.route_between(tiny_graph.segments[e.route[0]].path[0], e.destination),
     )
     assert 0.5 <= eps <= 0.99
 
@@ -56,9 +52,11 @@ def test_evaluate_three_models_and_shared_denominators(tiny_graph, tiny_events) 
 def test_nan_metric_not_reported_as_zero(tiny_graph) -> None:
     lone = [make_event("only", "2025-01-01", ["s0", "s1"])]
     result = evaluate(tiny_graph, lone)
-    assert result.n_events == 0 or math.isnan(
-        result.summary["route_model"]["mean_log_likelihood"] or float("nan")
-    ) or result.summary["route_model"]["mean_log_likelihood_n"] == 0
+    assert (
+        result.n_events == 0
+        or math.isnan(result.summary["route_model"]["mean_log_likelihood"] or float("nan"))
+        or result.summary["route_model"]["mean_log_likelihood_n"] == 0
+    )
 
 
 def test_step_loglik_uniform(tiny_graph) -> None:
@@ -69,9 +67,7 @@ def test_step_loglik_uniform(tiny_graph) -> None:
 
 def test_baseline_ll_with_epsilon(tiny_graph) -> None:
     ev = make_event("e", "2024-05-01", ["s0", "s1"])
-    route = tiny_graph.route_between(
-        tiny_graph.segments["s0"].path[0], ev.destination
-    )
+    route = tiny_graph.route_between(tiny_graph.segments["s0"].path[0], ev.destination)
     ll = baseline_ll(tiny_graph, ev, route, 0.9)
     assert math.isfinite(ll)
 

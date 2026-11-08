@@ -58,7 +58,14 @@ def step_loglik(
         else:
             p = float(
                 model.probs(
-                    g, a, choices, event.destination, event.context, None, targets, net_dist=net_dist
+                    g,
+                    a,
+                    choices,
+                    event.destination,
+                    event.context,
+                    None,
+                    targets,
+                    net_dist=net_dist,
                 )[choices.index(b)]
             )
         ll.append(math.log(max(1e-12, p)))
@@ -172,8 +179,8 @@ def _random_walk_jaccard(
     for seed in range(RANDOM_WALK_ROLLOUT_SEEDS):
         rng = np.random.default_rng(seed)
 
-        def pick(_cur: str, options: list[str]) -> str:
-            return options[int(rng.integers(len(options)))]
+        def pick(_cur: str, options: list[str], _rng: np.random.Generator = rng) -> str:
+            return options[int(_rng.integers(len(options)))]
 
         path = rollout_path(g, event.route[0], chosen_end, pick, _max_steps(event))
         scores.append(jaccard(path, event.route))

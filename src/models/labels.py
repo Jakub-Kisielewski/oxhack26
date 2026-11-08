@@ -5,7 +5,12 @@ from collections import Counter
 from dataclasses import dataclass
 from src.database import mapdata
 from src.models.features import dark_fraction
-from src.config import DEFAULT_TURNOUT, INTERPOLATED_WEIGHT, WAYPOINT_LABEL_RADIUS_M
+from src.config import (
+    DEFAULT_TURNOUT,
+    INTERPOLATED_WEIGHT,
+    MARCH_HOURS,
+    WAYPOINT_LABEL_RADIUS_M,
+)
 from src.models.graph import MarchGraph
 
 
@@ -35,9 +40,9 @@ def read_events(
     )
     rains = {str(k): float(x or 0) for k, x, _ in ctx_rows}
     daylight = {str(k): d for k, _, d in ctx_rows}
-    time_rows = mapdata.cursor().execute(
-        """SELECT event_id, start_time, end_time FROM events"""
-    ).fetchall()
+    time_rows = (
+        mapdata.cursor().execute("""SELECT event_id, start_time, end_time FROM events""").fetchall()
+    )
     march_hours: dict[str, float] = {}
     for eid, start, end in time_rows:
         eid = str(eid)
@@ -45,10 +50,8 @@ def read_events(
             delta = (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute)
             if delta > 0:
                 march_hours[eid] = delta / 60.0
-    from src.config import MARCH_HOURS as default_hours
-
     darks = {
-        eid: dark_fraction(daylight.get(eid), march_hours.get(eid, default_hours)) for eid in rains
+        eid: dark_fraction(daylight.get(eid), march_hours.get(eid, MARCH_HOURS)) for eid in rains
     }
     output = []
     for e in historic:
