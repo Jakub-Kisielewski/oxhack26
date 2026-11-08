@@ -23,10 +23,6 @@ METRICS = {
         "Top route overlap",
         "Share of the true route's streets that the top predicted route uses.",
     ),
-    "destination_in_top3": (
-        "True end in top 3",
-        "How often the real end point was among the three likeliest destinations.",
-    ),
 }
 
 
@@ -62,4 +58,17 @@ def backtest_charts(bt: BacktestResult) -> None:
         with col:
             st.markdown(f"**{title}**")
             st.altair_chart((bars + text).properties(height=220), width="stretch")
-            st.caption(help_text)
+            n_key = f"{metric}_n"
+            n_vals = [bt.summary[m].get(n_key) for m in models if n_key in bt.summary.get(m, {})]
+            if n_vals:
+                st.caption(f"{help_text} (n={int(n_vals[0])} events per model.)")
+            else:
+                st.caption(help_text)
+    if bt.destination_summary and bt.destination_summary.get("destination_top3_rate") is not None:
+        rate = bt.destination_summary["destination_top3_rate"]
+        n = int(bt.destination_summary.get("n_events", 0))
+        st.markdown(
+            f"**Destination model:** true end in top 3 candidates — "
+            f"{rate:.0%} ({n} events). "
+            "This measures the destination shortlist, not the route logit."
+        )

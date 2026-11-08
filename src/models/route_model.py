@@ -1,21 +1,23 @@
 """Weighted conditional logit on directed street-segment choices, trained by L-BFGS-B."""
 
 from __future__ import annotations
+
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+
 import numpy as np
 from scipy.optimize import minimize
 from scipy.special import softmax
-from src.config import LOGIT_MAXITER, LOGIT_REG
-from src.models.features import NAMES, feature_vector
-from src.models.labels import TrainingEvent, history_counts
-from src.models.graph import MarchGraph
 
-# Shrink noisy estimates toward small, interpretable prior effects (standardised features).
-# dark_x_main gets a real prior (+0.5: after dark, marches keep to main, lit roads) because most training
-# marches finish in daylight; with no dark marches the fit leaves it at this prior.
-PRIOR = np.array([0.5, 0.1, 0.05, 0.1, 0.1, -0.5, 0.1, -0.15, -0.3, 0.05, 0.05, 0.5], dtype=float)
+from src.config import BACKTEST_FOLD_MAXITER, LOGIT_MAXITER, LOGIT_REG
+from src.models.features import NAMES, feature_vector
+from src.models.graph import MarchGraph
+from src.models.labels import TrainingEvent
+
+
+# Shrink toward small, interpretable prior effects on standardised features.
+PRIOR = np.array([0.5, 0.1, 0.1, -0.5, 0.1, -0.3, 0.15, 0.2, -0.05], dtype=float)
 
 
 @dataclass
@@ -54,7 +56,6 @@ class ChoiceModel:
         saved = list(d["features"])
         if saved != list(NAMES)[: len(saved)]:
             raise ValueError("Feature version mismatch; retrain model")
-        # Older model files lack newer, appended features: those run at their prior until retrained.
         n = len(saved)
         return cls(
             list(d["theta"]) + PRIOR[n:].tolist(),
@@ -74,13 +75,16 @@ class ChoiceModel:
         context: dict | None = None,
         history: dict | None = None,
         targets: list | None = None,
+        net_dist: dict[str, float] | None = None,
     ):
         """Softmax turn probabilities over ``candidates`` at junction ``current``."""
         if not candidates:
             return np.array([])
         X = np.stack(
             [
-                feature_vector(g, current, b, destination, context, history, targets)
+                feature_vector(
+                    g, current, b, destination, context, history, targets, net_dist=net_dist
+                )
                 for b in candidates
             ]
         )
@@ -96,13 +100,13 @@ def fit(
     maxiter: int = LOGIT_MAXITER,
 ) -> ChoiceModel:
     """Fit L-BFGS-B conditional logit on junction choices from ``events``."""
-    history = history_counts(events)
     arrays = []
     indices = []
     weights = []
     n_events = 0
     for event in events:
         targ = targets_for(event.cause) if targets_for else []
+        net_dist = g.network_distances_to(event.destination)
         n = 0
         for k, (current, chosen) in enumerate(zip(event.route, event.route[1:])):
             options = g.next_ids(current)
@@ -110,7 +114,16 @@ def fit(
                 continue
             X = np.stack(
                 [
-                    feature_vector(g, current, b, event.destination, event.context, history, targ)
+                    feature_vector(
+                        g,
+                        current,
+                        b,
+                        event.destination,
+                        event.context,
+                        None,
+                        targ,
+                        net_dist=net_dist,
+                    )
                     for b in options
                 ]
             )
@@ -136,8 +149,6 @@ def fit(
     weighted_chosen_X = w @ X[chosen_idx]
 
     def loss_grad(theta):
-        # Batched ragged softmax: avoids tens of thousands of Python loops per
-        # optimiser iteration and makes leave-one-event-out backtests feasible.
         logits = X @ theta
         maxima = np.maximum.reduceat(logits, offsets[:-1])
         expvalues = np.exp(logits - np.repeat(maxima, sizes))
@@ -151,16 +162,6 @@ def fit(
     result = minimize(
         loss_grad, prior, method="L-BFGS-B", jac=True, options={"maxiter": maxiter, "ftol": 1e-7}
     )
-    rain_support = sum(1 for e in events if float(e.context.get("precip_mm_4h") or 0) > 0.5)
-    dark_support = sum(1 for e in events if float(e.context.get("dark_fraction") or 0) > 0.05)
-    prior_only = [
-        name
-        for name, ok in (
-            ("rain_x_main", rain_support >= 2),
-            ("dark_x_main", dark_support >= 2),
-        )
-        if not ok
-    ]
     return ChoiceModel(
         result.x.tolist(),
         means.tolist(),
@@ -173,8 +174,40 @@ def fit(
             "weighted_choices": float(w.sum()),
             "loss": float(result.fun),
             "converged": bool(result.success),
-            "prior_only": prior_only,
-            "rain_support_events": rain_support,
-            "dark_support_events": dark_support,
+            "prior_only": [],
+            "reg": reg,
         },
     )
+
+
+def cluster_bootstrap(
+    g: MarchGraph,
+    events: list[TrainingEvent],
+    targets_for,
+    n_samples: int = 100,
+    reg: float = LOGIT_REG,
+) -> dict[str, list[float]]:
+    """Resample events with replacement, refit, and return coefficient percentiles."""
+    if len(events) < 2:
+        return {}
+    thetas: list[np.ndarray] = []
+    rng = np.random.default_rng(42)
+    for _ in range(n_samples):
+        idx = rng.integers(0, len(events), len(events))
+        sample = [events[int(i)] for i in idx]
+        if len(sample) < 2:
+            continue
+        model = fit(g, sample, targets_for=targets_for, reg=reg, maxiter=BACKTEST_FOLD_MAXITER)
+        if model.fitted:
+            thetas.append(np.asarray(model.theta))
+    if not thetas:
+        return {}
+    stack = np.vstack(thetas)
+    return {
+        name: [
+            float(np.percentile(stack[:, j], 5)),
+            float(np.percentile(stack[:, j], 50)),
+            float(np.percentile(stack[:, j], 95)),
+        ]
+        for j, name in enumerate(NAMES)
+    }

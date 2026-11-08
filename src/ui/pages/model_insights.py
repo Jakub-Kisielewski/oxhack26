@@ -25,7 +25,6 @@ else:
                     "model": r.model,
                     "mean_log_likelihood": r.mean_log_likelihood,
                     "top1_jaccard": r.top1_jaccard,
-                    "destination_in_top3": r.destination_in_top3,
                 }
                 for r in bt.rows
             ],

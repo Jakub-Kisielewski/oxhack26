@@ -28,13 +28,28 @@ def read_events(
 ) -> list[TrainingEvent]:
     """Load protest events from DuckDB and snap waypoints onto ``g``."""
     historic = mapdata.historical_events(protests_only=True)
-    rows = (
+    ctx_rows = (
         mapdata.cursor()
         .execute("""SELECT event_id, precip_mm_4h, daylight_after_start_h FROM event_context""")
         .fetchall()
     )
-    rains = {str(k): float(x or 0) for k, x, _ in rows}
-    darks = {str(k): dark_fraction(d) for k, _, d in rows}
+    rains = {str(k): float(x or 0) for k, x, _ in ctx_rows}
+    daylight = {str(k): d for k, _, d in ctx_rows}
+    time_rows = mapdata.cursor().execute(
+        """SELECT event_id, start_time, end_time FROM events"""
+    ).fetchall()
+    march_hours: dict[str, float] = {}
+    for eid, start, end in time_rows:
+        eid = str(eid)
+        if start is not None and end is not None:
+            delta = (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute)
+            if delta > 0:
+                march_hours[eid] = delta / 60.0
+    from src.config import MARCH_HOURS as default_hours
+
+    darks = {
+        eid: dark_fraction(daylight.get(eid), march_hours.get(eid, default_hours)) for eid in rains
+    }
     output = []
     for e in historic:
         if len(e.waypoints) < 2:
@@ -70,9 +85,15 @@ def read_events(
     return output
 
 
-def history_counts(events: list[TrainingEvent]) -> dict[str, int]:
-    """Count how many events used each segment (for the ``history`` feature)."""
-    counts = Counter()
+def history_counts(events: list[TrainingEvent], before: str | None = None) -> dict[str, int]:
+    """Count prior segment use per event, optionally strictly before ``before`` (ISO date).
+
+    Used only where legacy callers still pass a history dict; the current feature set
+    no longer includes street history.
+    """
+    counts: Counter[str] = Counter()
     for event in events:
-        counts.update(set(event.route))  # one observation per event, not number of loops
+        if before is not None and event.date >= before:
+            continue
+        counts.update(set(event.route))
     return dict(counts)

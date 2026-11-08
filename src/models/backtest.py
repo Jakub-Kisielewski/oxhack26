@@ -1,33 +1,54 @@
-"""Leakage-controlled leave-one-event-out test (reported routes, not observed GPS).
+"""Walk-forward leave-one-event-out test (reported routes, not observed GPS).
 
 No metric is invented: if the learned model loses to the baseline, that loss is
 recorded and surfaced in the dashboard.
 """
 
 from __future__ import annotations
+
 import json
 import math
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+
 import numpy as np
+from scipy.optimize import minimize_scalar
+
+from src.config import (
+    BACKTEST_FOLD_MAXITER,
+    BASELINE_EPSILON_BOUNDS,
+    LOGIT_REG,
+    RANDOM_WALK_ROLLOUT_SEEDS,
+    ROLLOUT_STOP_DISTANCE_M,
+)
 from src.database import mapdata
-from src.models.types import BacktestResult, BacktestRow
+from src.models.destinations import candidates, destination_top3_hit
 from src.models.graph import MarchGraph
-from src.models.labels import TrainingEvent, history_counts
-from src.config import BACKTEST_FOLD_MAXITER
+from src.models.labels import TrainingEvent
 from src.models.route_model import ChoiceModel, fit
-from src.models.destinations import candidates
+from src.models.types import BacktestResult, BacktestRow
 
 
-def jaccard(a, b):
+def jaccard(a: list[str], b: list[str]) -> float:
     """Jaccard similarity between two segment-id sequences."""
     sa, sb = set(a), set(b)
     return len(sa & sb) / len(sa | sb) if sa | sb else 0.0
 
 
-def step_loglik(g: MarchGraph, event: TrainingEvent, model: ChoiceModel | None, history, targets):
+def step_loglik(
+    g: MarchGraph,
+    event: TrainingEvent,
+    model: ChoiceModel | None,
+    history: dict[str, int] | None,
+    targets: list,
+    net_dist: dict[str, float] | None = None,
+) -> float:
     """Mean log-probability of realised turns (uniform if ``model`` is None)."""
+    del history
     ll = []
+    if net_dist is None:
+        net_dist = g.network_distances_to(event.destination)
     for a, b in zip(event.route, event.route[1:]):
         choices = g.next_ids(a)
         if b not in choices or not choices:
@@ -36,107 +57,215 @@ def step_loglik(g: MarchGraph, event: TrainingEvent, model: ChoiceModel | None, 
             p = 1 / len(choices)
         else:
             p = float(
-                model.probs(g, a, choices, event.destination, event.context, history, targets)[
-                    choices.index(b)
-                ]
+                model.probs(
+                    g, a, choices, event.destination, event.context, None, targets, net_dist=net_dist
+                )[choices.index(b)]
             )
         ll.append(math.log(max(1e-12, p)))
     return sum(ll) / len(ll) if ll else float("nan")
 
 
-def baseline_ll(g: MarchGraph, event: TrainingEvent, route: list[str]):
-    """Mean log-likelihood under an epsilon-smoothed shortest-path policy."""
-    # An epsilon-smoothed greedy-path distribution: 90% preferred turn,
-    # 10% allocated to alternatives. This is a modelling choice, not a fitted score.
+def _baseline_prob(epsilon: float, choices: list[str], sp_next: str | None, actual: str) -> float:
+    if len(choices) == 1:
+        return 1.0
+    if sp_next not in choices:
+        return 1.0 / len(choices)
+    if actual == sp_next:
+        return epsilon
+    return (1.0 - epsilon) / max(1, len(choices) - 1)
+
+
+def fit_baseline_epsilon(
+    g: MarchGraph,
+    events: list[TrainingEvent],
+    route_for: Callable[[TrainingEvent], list[str]],
+) -> float:
+    """MLE for epsilon in an epsilon-greedy shortest-path policy."""
+
+    def neg_ll(epsilon: float) -> float:
+        total = 0.0
+        for event in events:
+            route = route_for(event)
+            pathnext = dict(zip(route, route[1:]))
+            for a, b in zip(event.route, event.route[1:]):
+                choices = g.next_ids(a)
+                if b not in choices or not choices:
+                    continue
+                p = _baseline_prob(epsilon, choices, pathnext.get(a), b)
+                total += math.log(max(1e-12, p))
+        return -total
+
+    if not events:
+        return 0.9
+    result = minimize_scalar(
+        neg_ll, bounds=BASELINE_EPSILON_BOUNDS, method="bounded", options={"xatol": 1e-4}
+    )
+    return float(result.x) if result.success else 0.9
+
+
+def baseline_ll(
+    g: MarchGraph,
+    event: TrainingEvent,
+    route: list[str],
+    epsilon: float,
+) -> float:
+    """Mean log-likelihood under a fitted epsilon-smoothed shortest-path policy."""
     pathnext = dict(zip(route, route[1:]))
     ll = []
     for a, b in zip(event.route, event.route[1:]):
         choices = g.next_ids(a)
         if b not in choices or not choices:
             continue
-        chosen = pathnext.get(a)
-        p = (
-            (0.9 if chosen == b else 0.1 / max(1, len(choices) - 1))
-            if chosen in choices and len(choices) > 1
-            else 1 / len(choices)
-        )
+        p = _baseline_prob(epsilon, choices, pathnext.get(a), b)
         ll.append(math.log(max(1e-12, p)))
     return sum(ll) / len(ll) if ll else float("nan")
 
 
+def rollout_path(
+    g: MarchGraph,
+    start_seg: str,
+    chosen_end: tuple[float, float],
+    pick: Callable[[str, list[str]], str],
+    max_steps: int,
+) -> list[str]:
+    """Rollout without a no-revisit constraint (matches the likelihood)."""
+    cur = start_seg
+    path = [cur]
+    for _ in range(max_steps):
+        if mapdata.distance_m(g.segments[cur].path[-1], chosen_end) < ROLLOUT_STOP_DISTANCE_M:
+            break
+        options = g.next_ids(cur)
+        if not options:
+            break
+        cur = pick(cur, options)
+        path.append(cur)
+    return path
+
+
+def _max_steps(event: TrainingEvent) -> int:
+    return min(500, max(30, len(event.route) * 2))
+
+
+def _model_rollout(
+    g: MarchGraph,
+    event: TrainingEvent,
+    model: ChoiceModel,
+    chosen_end: tuple[float, float],
+    targets: list,
+    net_dist: dict[str, float],
+) -> list[str]:
+    def pick(cur: str, options: list[str]) -> str:
+        probs = model.probs(
+            g, cur, options, chosen_end, event.context, None, targets, net_dist=net_dist
+        )
+        return options[int(np.argmax(probs))]
+
+    return rollout_path(g, event.route[0], chosen_end, pick, _max_steps(event))
+
+
+def _random_walk_jaccard(
+    g: MarchGraph,
+    event: TrainingEvent,
+    chosen_end: tuple[float, float],
+) -> float:
+    scores = []
+    for seed in range(RANDOM_WALK_ROLLOUT_SEEDS):
+        rng = np.random.default_rng(seed)
+
+        def pick(_cur: str, options: list[str]) -> str:
+            return options[int(rng.integers(len(options)))]
+
+        path = rollout_path(g, event.route[0], chosen_end, pick, _max_steps(event))
+        scores.append(jaccard(path, event.route))
+    return sum(scores) / len(scores) if scores else float("nan")
+
+
+def _mean_finite(values: list[float]) -> tuple[float | None, int]:
+    valid = [v for v in values if math.isfinite(v)]
+    if not valid:
+        return None, 0
+    return sum(valid) / len(valid), len(valid)
+
+
 def evaluate(
-    g: MarchGraph, events: list[TrainingEvent], max_events: int | None = None
+    g: MarchGraph,
+    events: list[TrainingEvent],
+    max_events: int | None = None,
+    reg: float = LOGIT_REG,
 ) -> BacktestResult:
-    """Leave-one-event-out backtest against shortest-path and random-walk baselines."""
-    rows = []
-    eligible = [e for e in events if len(e.route) >= 2]
+    """Walk-forward backtest against shortest-path and random-walk baselines."""
+    rows: list[BacktestRow] = []
+    destination_hits: list[float] = []
+    eligible = sorted([e for e in events if len(e.route) >= 2], key=lambda e: e.date)
     if max_events is not None:
         eligible = eligible[:max_events]
-    for i, event in enumerate(eligible):
-        training = [e for e in events if e.event_id != event.event_id]
-        hist = history_counts(training)
+    targets_fn = mapdata.cause_targets
 
-        def targets(cause):
-            return mapdata.cause_targets(cause)
+    def sp_route_for(train_event: TrainingEvent) -> list[str]:
+        prior = [e for e in eligible if e.date < train_event.date]
+        ev_dests = candidates(train_event.cause, prior)
+        end_pt = ev_dests[0].lonlat if ev_dests else train_event.destination
+        return g.route_between(g.segments[train_event.route[0]].path[0], end_pt)
 
-        model = fit(g, training, targets_for=targets, maxiter=BACKTEST_FOLD_MAXITER)
+    for event in eligible:
+        training = [e for e in eligible if e.date < event.date]
+        if len(training) < 2:
+            continue
+        model = fit(g, training, targets_for=targets_fn, maxiter=BACKTEST_FOLD_MAXITER, reg=reg)
+        net_dist = g.network_distances_to(event.destination)
         dests = candidates(event.cause, training)
         chosen_end = dests[0].lonlat if dests else event.destination
-        start = g.segments[event.route[0]].path[0]
-        baseline = g.route_between(start, chosen_end)
-        # Model top1 path: evaluate a short greedy rollout using learned probabilities;
-        # route inference (which uses Yen and a sparse solve) is tested separately.
-        cur = event.route[0]
-        top = [cur]
-        seen = {cur}
-        for _ in range(min(500, max(30, len(event.route) * 2))):
-            if mapdata.distance_m(g.segments[cur].path[-1], chosen_end) < 75:
-                break
-            options = [x for x in g.next_ids(cur) if x not in seen]
-            if not options:
-                break
-            probs = model.probs(
-                g, cur, options, chosen_end, event.context, hist, targets(event.cause)
-            )
-            cur = options[int(np.argmax(probs))]
-            top.append(cur)
-            seen.add(cur)
-        hit = any(mapdata.distance_m(d.lonlat, event.destination) < 250 for d in dests[:3])
+        sp_route = g.route_between(g.segments[event.route[0]].path[0], chosen_end)
+        epsilon = fit_baseline_epsilon(g, training, sp_route_for)
+        targ = targets_fn(event.cause)
+        model_path = _model_rollout(g, event, model, chosen_end, targ, net_dist)
+        destination_hits.append(float(destination_top3_hit(event, training)))
         rows.extend(
             [
                 BacktestRow(
                     event.event_id,
                     "route_model",
-                    step_loglik(g, event, model, hist, targets(event.cause)),
-                    jaccard(top, event.route),
-                    hit,
+                    step_loglik(g, event, model, None, targ, net_dist),
+                    jaccard(model_path, event.route),
                 ),
                 BacktestRow(
                     event.event_id,
                     "shortest_path",
-                    baseline_ll(g, event, baseline),
-                    jaccard(baseline, event.route),
-                    hit,
+                    baseline_ll(g, event, sp_route, epsilon),
+                    jaccard(sp_route, event.route),
                 ),
                 BacktestRow(
-                    event.event_id, "random_walk", step_loglik(g, event, None, hist, []), 0.0, False
+                    event.event_id,
+                    "random_walk",
+                    step_loglik(g, event, None, None, [], net_dist),
+                    _random_walk_jaccard(g, event, chosen_end),
                 ),
             ]
         )
-    summary = {}
+    summary: dict[str, dict[str, float | int | None]] = {}
     for name in ("route_model", "shortest_path", "random_walk"):
         selected = [r for r in rows if r.model == name]
-
-        def avg(values):
-            valid = [v for v in values if math.isfinite(v)]
-            return sum(valid) / len(valid) if valid else 0.0
-
+        ll_mean, ll_n = _mean_finite([r.mean_log_likelihood for r in selected])
+        j_mean, j_n = _mean_finite([r.top1_jaccard for r in selected])
         summary[name] = {
-            "mean_log_likelihood": avg([r.mean_log_likelihood for r in selected]),
-            "top1_jaccard": avg([r.top1_jaccard for r in selected]),
-            "destination_top3_rate": avg([int(r.destination_in_top3) for r in selected]),
+            "mean_log_likelihood": ll_mean if ll_mean is not None else float("nan"),
+            "mean_log_likelihood_n": ll_n,
+            "top1_jaccard": j_mean if j_mean is not None else float("nan"),
+            "top1_jaccard_n": j_n,
         }
-    return BacktestResult(rows, summary, len(eligible), datetime.now(timezone.utc).isoformat())
+    dest_rate, dest_n = _mean_finite(destination_hits)
+    destination_summary = {
+        "destination_top3_rate": dest_rate if dest_rate is not None else float("nan"),
+        "n_events": float(dest_n),
+    }
+    n_eval = len({r.event_id for r in rows})
+    return BacktestResult(
+        rows,
+        summary,
+        n_eval,
+        datetime.now(timezone.utc).isoformat(),
+        destination_summary,
+    )
 
 
 def save_backtest(res: BacktestResult, path: Path):
@@ -146,14 +275,24 @@ def save_backtest(res: BacktestResult, path: Path):
         json.dump(res.to_dict(), f, indent=2, allow_nan=False)
 
 
-def read_backtest(path: Path):
+def read_backtest(path: Path) -> BacktestResult | None:
     """Load a backtest JSON file; return ``None`` if missing."""
     if not path.exists():
         return None
     data = json.loads(path.read_text())
+    rows = [
+        BacktestRow(
+            r["event_id"],
+            r["model"],
+            r["mean_log_likelihood"],
+            r["top1_jaccard"],
+        )
+        for r in data["rows"]
+    ]
     return BacktestResult(
-        [BacktestRow(**r) for r in data["rows"]],
+        rows,
         data["summary"],
         data["n_events"],
         data["created_at"],
+        data.get("destination_summary"),
     )

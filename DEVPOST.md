@@ -62,7 +62,7 @@ No single source can predict a route. The value comes from joining them on one s
 
 A march is modelled as a walk through the street network: at every junction it picks the next street. We learn how it picks.
 
-1. **Route choice: a conditional logit model.** At each junction, the probability of taking street *b* from street *a* is a softmax over the candidate streets, using 12 features of each candidate: progress towards the destination, width, width × turnout, main road, centrality, turn angle, pull of the cause's targets, Royal Park, restricted zone, past use, rain × main road and darkness × main road. Weights are fitted by weighted maximum likelihood with L-BFGS, regularised towards small, sensible priors. Waypoints from published plans count fully; streets we interpolated between them count 0.3.
+1. **Route choice: a conditional logit model.** At each junction, the probability of taking street *b* from street *a* is a softmax over nine walk-network features: network progress toward the destination, width, main road, turn angle, cause target pull, restricted zone, Thames bridge, street-name continuity and segment length. Weights are fitted by weighted maximum likelihood with L-BFGS, regularised toward stated priors. Waypoints from published plans count fully; streets we interpolated between them count 0.3.
 2. **Street probabilities: an absorbing Markov chain.** The learned turn probabilities form a transition matrix. One sparse linear solve gives the expected number of visits to every street, not a single route. That is the heatmap.
 3. **Top routes: Yen's k-shortest paths** on −log(probability), so the top routes are the likeliest paths, each with its share.
 4. **Destinations:** candidate end points come from past marches for the same cause and the cause's targets (an embassy, Parliament, Downing Street), weighted by how often they were used.
@@ -88,7 +88,7 @@ The same prediction drives all of them, so the decisions are consistent: the str
 
 ## How we test it
 
-Every training run ends with a **leave-one-march-out backtest**, and the results are shown in the app, including any metric where the model loses. Each past march is hidden in turn. The model is refitted on the others, with the street-history feature rebuilt so the hidden march never leaks in, and then asked to predict it. We compare three predictors:
+Every training run ends with a **walk-forward leave-one-march-out backtest**, and the results are shown in the app, including any metric where the model loses. Each march is scored using only marches that occurred earlier in time. We compare three route predictors (destination top-3 is reported separately for the destination shortlist, not as a route-model score):
 
 - **Route model:** our conditional logit.
 - **Shortest path:** the shortest walk to the likeliest end point, which is what a planner would assume with no model.

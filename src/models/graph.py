@@ -144,6 +144,21 @@ class MarchGraph:
         nodes = self.route_nodes(self.nearest_node(a), self.nearest_node(b))
         return [self.pair_segment[(u, v)] for u, v in zip(nodes, nodes[1:])]
 
+    def network_distances_to(self, destination: LonLat) -> dict[str, float]:
+        """Network distance (m) from each segment's end node to ``destination`` along walks."""
+        if not self.node_graph:
+            return {}
+        end_node = self.nearest_node(destination)
+        rev = self.node_graph.reverse(copy=False)
+        try:
+            node_dists = nx.single_source_dijkstra_path_length(rev, end_node, weight="weight")
+        except nx.NodeNotFound:
+            return {}
+        out: dict[str, float] = {}
+        for sid, seg in self.segments.items():
+            out[sid] = float(node_dists.get(seg.v, float("inf")))
+        return out
+
     def snap_route(self, points: list[LonLat]) -> list[str]:
         """Chain shortest paths through ordered waypoints into one segment list."""
         if len(points) < 2:
