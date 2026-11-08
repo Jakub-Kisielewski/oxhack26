@@ -11,7 +11,9 @@ Built at OxHack 2026 in a team of four. **I built the ingestion layer** — see 
 
 ![Backtest insights page](docs/images/model-insights.png)
 
-**Demo:** local only (`streamlit run app.py` after training); no public deployment.
+![Route comparison map](docs/images/route-map.png)
+
+**Demo:** local only (`streamlit run app.py` after training); two pages — backtest summary and route map. Re-run training after upgrading the app so `backtest.json` includes persisted leave-one-out paths for the map.
 
 ## Tech stack
 
@@ -158,7 +160,8 @@ The same suite runs in CI on every push and pull request.
 ```bash
 streamlit run app.py
 ```
-- The app shows **leave-one-event-out backtest** charts from `data/models/backtest.json` after training.
+- **Backtest results** — charts, coefficient table, and per-event metrics from `data/models/backtest.json`.
+- **Route comparison** — pydeck map of actual vs leave-one-out model paths; optional what-if rollout on the full-data model (DuckDB required for zones and event context).
 - Close the app before re-running `python ingest.py`: it holds the database open.
 
 ## Database

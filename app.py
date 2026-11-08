@@ -1,4 +1,4 @@
-"""Streamlit entrypoint: backtest insights page only."""
+"""Streamlit entrypoint: backtest summary and route comparison map."""
 
 import streamlit as st
 
@@ -11,6 +11,11 @@ st.navigation(
             title="Backtest results",
             icon=":material/insights:",
             default=True,
+        ),
+        st.Page(
+            "src/ui/pages/route_map.py",
+            title="Route comparison",
+            icon=":material/map:",
         ),
     ]
 ).run()

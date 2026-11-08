@@ -57,14 +57,46 @@ class ChoiceModel:
         if saved != list(NAMES)[: len(saved)]:
             raise ValueError("Feature version mismatch; retrain model")
         n = len(saved)
+        stats = dict(d["stats"])
+        stats.setdefault("prior_only", list(NAMES[n:]))
         return cls(
             list(d["theta"]) + PRIOR[n:].tolist(),
             list(d["mean"]) + [0.0] * (len(NAMES) - n),
             list(d["std"]) + [1.0] * (len(NAMES) - n),
             NAMES,
             d["fitted"],
-            {**d["stats"], "prior_only": list(NAMES[n:])},
+            stats,
         )
+
+    def _compute_turn(
+        self,
+        g: MarchGraph,
+        current: str,
+        candidates: list[str],
+        destination: tuple[float, float],
+        context: dict | None = None,
+        history: dict | None = None,
+        targets: list | None = None,
+        net_dist: dict[str, float] | None = None,
+    ) -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray]:
+        """Return reachable ``candidates``, normalised features, utilities, probabilities."""
+        if not candidates:
+            return [], np.empty((0, len(self.theta))), np.array([]), np.array([])
+        if net_dist is not None:
+            candidates = reachable_candidates(candidates, net_dist, current)
+        if not candidates:
+            return [], np.empty((0, len(self.theta))), np.array([]), np.array([])
+        raw = np.stack(
+            [
+                feature_vector(
+                    g, current, b, destination, context, history, targets, net_dist=net_dist
+                )
+                for b in candidates
+            ]
+        )
+        z = (raw - np.asarray(self.mean)) / np.maximum(np.asarray(self.std), 1e-6)
+        utility = np.clip(z @ np.asarray(self.theta), -100, 100)
+        return candidates, z, utility, softmax(utility)
 
     def probs(
         self,
@@ -78,22 +110,36 @@ class ChoiceModel:
         net_dist: dict[str, float] | None = None,
     ):
         """Softmax turn probabilities over ``candidates`` at junction ``current``."""
-        if not candidates:
-            return np.array([])
-        if net_dist is not None:
-            candidates = reachable_candidates(candidates, net_dist, current)
-        if not candidates:
-            return np.array([])
-        X = np.stack(
-            [
-                feature_vector(
-                    g, current, b, destination, context, history, targets, net_dist=net_dist
-                )
-                for b in candidates
-            ]
+        *_, probs = self._compute_turn(
+            g, current, candidates, destination, context, history, targets, net_dist
         )
-        x = (X - np.asarray(self.mean)) / np.maximum(np.asarray(self.std), 1e-6)
-        return softmax(np.clip(x @ np.asarray(self.theta), -100, 100))
+        return probs
+
+    def explain_turn(
+        self,
+        g: MarchGraph,
+        current: str,
+        candidates: list[str],
+        destination: tuple[float, float],
+        context: dict | None = None,
+        history: dict | None = None,
+        targets: list | None = None,
+        net_dist: dict[str, float] | None = None,
+    ) -> dict[str, object]:
+        """Feature matrix and utilities at one junction (for UI breakdowns)."""
+        cand, z, utility, probs = self._compute_turn(
+            g, current, candidates, destination, context, history, targets, net_dist
+        )
+        theta = np.asarray(self.theta)
+        return {
+            "candidates": cand,
+            "probs": probs,
+            "z": z,
+            "theta": theta,
+            "names": list(self.features),
+            "utility": utility,
+            "contributions": z * theta,
+        }
 
 
 def fit(

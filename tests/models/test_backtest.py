@@ -76,3 +76,92 @@ def test_destination_summary_present(tiny_graph, tiny_events) -> None:
     result = evaluate(tiny_graph, tiny_events)
     assert result.destination_summary is not None
     assert "destination_top3_rate" in result.destination_summary
+
+
+def test_save_backtest_writes_null_for_nan_summary(tmp_path) -> None:
+    from src.models.backtest import read_backtest, save_backtest
+    from src.models.types import BacktestResult
+
+    res = BacktestResult(
+        rows=[],
+        summary={
+            "shortest_path": {
+                "mean_log_likelihood": float("nan"),
+                "mean_log_likelihood_n": 0,
+            }
+        },
+        n_events=0,
+        created_at="2025-01-01T00:00:00+00:00",
+        destination_summary={"destination_top3_rate": float("nan"), "n_events": 0.0},
+    )
+    path = tmp_path / "backtest.json"
+    save_backtest(res, path)
+    assert "NaN" not in path.read_text()
+    loaded = read_backtest(path)
+    assert loaded is not None
+    assert loaded.summary["shortest_path"]["mean_log_likelihood"] is None
+
+
+def test_save_backtest_row_path_round_trip(tmp_path) -> None:
+    from src.models.backtest import read_backtest, save_backtest
+    from src.models.types import BacktestResult, BacktestRow
+
+    res = BacktestResult(
+        rows=[
+            BacktestRow("e1", "route_model", -0.1, 0.5, ["s0", "s1", "s2"]),
+        ],
+        summary={},
+        n_events=1,
+        created_at="2025-01-01T00:00:00+00:00",
+    )
+    path = tmp_path / "backtest.json"
+    save_backtest(res, path)
+    loaded = read_backtest(path)
+    assert loaded is not None
+    assert loaded.rows[0].path == ["s0", "s1", "s2"]
+
+
+def test_read_backtest_legacy_row_without_path(tmp_path) -> None:
+    from src.models.backtest import read_backtest
+
+    path = tmp_path / "backtest.json"
+    path.write_text(
+        """{
+  "rows": [{"event_id": "e1", "model": "route_model",
+            "mean_log_likelihood": -0.1, "top1_jaccard": 0.5}],
+  "summary": {}, "n_events": 1, "created_at": "2025-01-01T00:00:00+00:00"
+}"""
+    )
+    loaded = read_backtest(path)
+    assert loaded is not None
+    assert loaded.rows[0].path == []
+
+
+def test_actual_routes_and_chosen_ends_round_trip(tmp_path) -> None:
+    from src.models.backtest import read_backtest, save_backtest
+    from src.models.types import BacktestResult
+
+    res = BacktestResult(
+        rows=[],
+        summary={},
+        n_events=0,
+        created_at="2025-01-01T00:00:00+00:00",
+        actual_routes={"e1": ["a", "b"]},
+        chosen_ends={"e1": (-0.12, 51.5)},
+    )
+    path = tmp_path / "backtest.json"
+    save_backtest(res, path)
+    loaded = read_backtest(path)
+    assert loaded is not None
+    assert loaded.actual_routes == {"e1": ["a", "b"]}
+    assert loaded.chosen_ends == {"e1": (-0.12, 51.5)}
+
+
+def test_evaluate_persists_paths(tiny_graph, tiny_events) -> None:
+    result = evaluate(tiny_graph, tiny_events)
+    assert result.actual_routes
+    assert result.chosen_ends
+    by_event = {r.event_id: r for r in result.rows if r.model == "route_model"}
+    for eid, row in by_event.items():
+        assert row.path
+        assert result.actual_routes.get(eid)

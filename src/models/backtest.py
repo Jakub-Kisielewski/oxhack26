@@ -209,6 +209,8 @@ def evaluate(
 ) -> BacktestResult:
     """Walk-forward backtest against shortest-path and random-walk baselines."""
     rows: list[BacktestRow] = []
+    actual_routes: dict[str, list[str]] = {}
+    chosen_ends: dict[str, tuple[float, float]] = {}
     destination_hits: list[float] = []
     eligible = sorted([e for e in events if len(e.route) >= 2], key=lambda e: e.date)
     if max_events is not None:
@@ -233,6 +235,10 @@ def evaluate(
         epsilon = fit_baseline_epsilon(g, training, sp_route_for)
         targ = targets_fn(event.cause)
         model_path = _model_rollout(g, event, model, chosen_end, targ, net_dist)
+        rw_pick = partial(_pick_uniform, generator=np.random.default_rng(0))
+        rw_path = rollout_path(g, event.route[0], chosen_end, rw_pick, _max_steps(event), net_dist)
+        actual_routes[event.event_id] = list(event.route)
+        chosen_ends[event.event_id] = chosen_end
         destination_hits.append(float(destination_top3_hit(event, training)))
         rows.extend(
             [
@@ -241,18 +247,21 @@ def evaluate(
                     "route_model",
                     step_loglik(g, event, model, None, targ, net_dist),
                     jaccard(model_path, event.route),
+                    model_path,
                 ),
                 BacktestRow(
                     event.event_id,
                     "shortest_path",
                     baseline_ll(g, event, sp_route, epsilon),
                     jaccard(sp_route, event.route),
+                    sp_route,
                 ),
                 BacktestRow(
                     event.event_id,
                     "random_walk",
                     step_loglik(g, event, None, None, [], net_dist),
                     _random_walk_jaccard(g, event, chosen_end),
+                    rw_path,
                 ),
             ]
         )
@@ -262,14 +271,14 @@ def evaluate(
         ll_mean, ll_n = _mean_finite([r.mean_log_likelihood for r in selected])
         j_mean, j_n = _mean_finite([r.top1_jaccard for r in selected])
         summary[name] = {
-            "mean_log_likelihood": ll_mean if ll_mean is not None else float("nan"),
+            "mean_log_likelihood": ll_mean,
             "mean_log_likelihood_n": ll_n,
-            "top1_jaccard": j_mean if j_mean is not None else float("nan"),
+            "top1_jaccard": j_mean,
             "top1_jaccard_n": j_n,
         }
     dest_rate, dest_n = _mean_finite(destination_hits)
     destination_summary = {
-        "destination_top3_rate": dest_rate if dest_rate is not None else float("nan"),
+        "destination_top3_rate": dest_rate,
         "n_events": float(dest_n),
     }
     n_eval = len({r.event_id for r in rows})
@@ -279,6 +288,8 @@ def evaluate(
         n_eval,
         datetime.now(timezone.utc).isoformat(),
         destination_summary,
+        actual_routes=actual_routes or None,
+        chosen_ends=chosen_ends or None,
     )
 
 
@@ -294,19 +305,33 @@ def read_backtest(path: Path) -> BacktestResult | None:
     if not path.exists():
         return None
     data = json.loads(path.read_text())
+
+    def _row_float(v: object) -> float:
+        if v is None:
+            return float("nan")
+        return float(v)
+
     rows = [
         BacktestRow(
             r["event_id"],
             r["model"],
-            r["mean_log_likelihood"],
-            r["top1_jaccard"],
+            _row_float(r["mean_log_likelihood"]),
+            _row_float(r["top1_jaccard"]),
+            list(r.get("path") or []),
         )
         for r in data["rows"]
     ]
+    raw_ends = data.get("chosen_ends") or {}
+    chosen_ends = (
+        {str(k): (float(v[0]), float(v[1])) for k, v in raw_ends.items()} if raw_ends else None
+    )
+    actual = data.get("actual_routes")
     return BacktestResult(
         rows,
         data["summary"],
         data["n_events"],
         data["created_at"],
         data.get("destination_summary"),
+        actual_routes={str(k): list(v) for k, v in actual.items()} if actual else None,
+        chosen_ends=chosen_ends,
     )
