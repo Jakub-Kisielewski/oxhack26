@@ -9,6 +9,7 @@ import math
 from src.config import (
     BACKTEST_PATH,
     CLUSTER_BOOTSTRAP_SAMPLES,
+    DB_PATH,
     GRAPH_PATH,
     QUICK_BACKTEST_EVENTS,
     ROUTE_MODEL_PATH,
@@ -36,6 +37,13 @@ def main():
         help="Skip cluster bootstrap (faster dev runs)",
     )
     args = parser.parse_args()
+    if not DB_PATH.is_file():
+        msg = (
+            f"Database not found: {DB_PATH}\n"
+            "Run ingestion first:  python ingest.py\n"
+            "Or load DuckDB only:  python ingest.py --only database"
+        )
+        raise SystemExit(msg)
     graph = build_graph(force=args.force_graph)
     logger.info("Graph: %s directed segments", len(graph.segments))
     events = read_events(graph)

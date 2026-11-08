@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""Per-street-segment features consumed by the route model (via segment_features merge).
+"""Per-street-segment attributes merged into DuckDB ``segments`` for the route model.
 
 For every directed edge of the walk network (segment_id = "u:v:key", same key as normalize.py):
-  width_m                 feature 2 (`log_width`) and 3 (`turnout_x_width`)
-  betweenness_main        feature 5 (`log_betweenness`): exact edge betweenness on the main-road
-                          network only; 0 off main (one estimator, one graph)
-  to_degree               junction degree at the downstream node (loaded in graph.py)
-  is_main                 feature 4
-  in_no_entry_zone        drops segments in graph.from_database (forbidden)
-  in_restricted_zone      feature 9
-  in_royal_park           feature 8
+  width_m            ``log_width`` in ``features.py``
+  is_main            ``is_main``
+  is_bridge          ``is_bridge`` (OSM ``bridge`` tag)
+  in_no_entry_zone   drops segments in ``graph.from_database``
+  in_restricted_zone ``restricted``
 
-Royal park polygons: raw/landmarks/open_spaces.geoparquet. Legal zones: seed/legal_zones.geojson.
-Crowd capacity / Fruin density were considered; see docs/crowd-density-note.md.
+Legal zones: seed/legal_zones.geojson. Royal parks are appended to ``legal_zones`` at DB load.
 
 OUT: normalised/edge_features.csv
 """
@@ -22,7 +18,6 @@ from __future__ import annotations
 import argparse
 import ast
 import re
-import time
 from pathlib import Path
 
 import geopandas as gpd
@@ -72,6 +67,7 @@ DEFAULT_WIDTH_M = {
     "corridor": 2,
 }
 FALLBACK_WIDTH_M = 6
+_BRIDGE_YES = frozenset({"yes", "true", "1", "viaduct", "movable"})
 
 
 def as_list(value: object) -> list:
@@ -121,6 +117,10 @@ def estimate_width(highway: object, width: object, lanes: object) -> float:
     return max(defaults) if defaults else FALLBACK_WIDTH_M
 
 
+def is_bridge_tag(value: object) -> bool:
+    return any(str(raw).strip().lower() in _BRIDGE_YES for raw in as_list(value))
+
+
 def undirected(graph: nx.MultiDiGraph) -> nx.Graph:
     """Simple undirected graph keeping the shortest parallel edge."""
     simple = nx.Graph()
@@ -131,34 +131,19 @@ def undirected(graph: nx.MultiDiGraph) -> nx.Graph:
     return simple
 
 
-def main_network_betweenness(main: nx.MultiDiGraph) -> dict[frozenset, float]:
-    """Exact normalized edge betweenness on the main-road graph only (feature 5)."""
-    simple = undirected(main)
-    scores = nx.edge_betweenness_centrality(simple, weight="length", normalized=True)
-    return {frozenset(edge): score for edge, score in scores.items()}
-
-
-def zone_flags(edges: gpd.GeoDataFrame, zones_path: Path, open_spaces_path: Path) -> pd.DataFrame:
+def zone_flags(edges: gpd.GeoDataFrame, zones_path: Path) -> pd.DataFrame:
     flags = pd.DataFrame(
         False,
         index=edges.index,
-        columns=["in_no_entry_zone", "in_restricted_zone", "in_royal_park"],
+        columns=["in_no_entry_zone", "in_restricted_zone"],
     )
-    layers: list[tuple[str, gpd.GeoDataFrame]] = []
-    if zones_path.exists():
-        zones = gpd.read_file(zones_path).to_crs("EPSG:4326")
-        layers += [
-            ("in_no_entry_zone", zones[zones.rule_type == "no_entry"]),
-            ("in_restricted_zone", zones[zones.rule_type == "restricted_activity"]),
-        ]
-    if open_spaces_path.exists():
-        parks = gpd.read_parquet(open_spaces_path).to_crs("EPSG:4326")
-        if "royal_park" in parks:
-            royal = parks[
-                parks.royal_park.fillna(False).astype(bool)
-                & parks.geom_type.isin(["Polygon", "MultiPolygon"])
-            ]
-            layers.append(("in_royal_park", royal))
+    if not zones_path.exists():
+        return flags
+    zones = gpd.read_file(zones_path).to_crs("EPSG:4326")
+    layers = [
+        ("in_no_entry_zone", zones[zones.rule_type == "no_entry"]),
+        ("in_restricted_zone", zones[zones.rule_type == "restricted_activity"]),
+    ]
     for column, polys in layers:
         if len(polys):
             hit = gpd.sjoin(
@@ -172,38 +157,28 @@ def build(
     walk: nx.MultiDiGraph,
     main: nx.MultiDiGraph | None,
     zones_path: Path,
-    open_spaces_path: Path,
 ) -> pd.DataFrame:
-    t0 = time.monotonic()
-    main_scores = main_network_betweenness(main) if main is not None else {}
-    print(f"main-network betweenness: {time.monotonic() - t0:.0f}s")
     main_ids = set(main.edges(keys=True)) if main is not None else set()
-    walk_simple = undirected(walk)
     edges = ox.graph_to_gdfs(walk, nodes=False, edges=True).reset_index()
     rows = []
     for edge in edges.itertuples(index=False):
         attrs = edge._asdict()
         width = estimate_width(attrs.get("highway"), attrs.get("width"), attrs.get("lanes"))
-        pair = frozenset((edge.u, edge.v))
         on_main = (edge.u, edge.v, edge.key) in main_ids
-        betweenness = float(main_scores.get(pair, 0.0)) if on_main else 0.0
-        to_degree = walk_simple.degree(edge.v)
         rows.append(
             {
                 "segment_id": f"{int(edge.u)}:{int(edge.v)}:{int(edge.key)}",
                 "width_m": round(width, 1),
-                "betweenness_main": betweenness,
-                "to_degree": to_degree,
                 "is_main": on_main,
+                "is_bridge": is_bridge_tag(attrs.get("bridge")),
                 "in_no_entry_zone": False,
                 "in_restricted_zone": False,
-                "in_royal_park": False,
             }
         )
     out = pd.DataFrame(rows)
-    flags = zone_flags(edges, zones_path, open_spaces_path)
-    out[["in_no_entry_zone", "in_restricted_zone", "in_royal_park"]] = flags[
-        ["in_no_entry_zone", "in_restricted_zone", "in_royal_park"]
+    flags = zone_flags(edges, zones_path)
+    out[["in_no_entry_zone", "in_restricted_zone"]] = flags[
+        ["in_no_entry_zone", "in_restricted_zone"]
     ].values
     return out
 
@@ -218,13 +193,13 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     walk = ox.load_graphml(args.walk)
     main_graph = ox.load_graphml(args.main) if Path(args.main).exists() else None
-    out = build(walk, main_graph, Path(args.legal_zones), Path(args.open_spaces))
+    out = build(walk, main_graph, Path(args.legal_zones))
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     out.to_csv(output, index=False)
     print(
         f"{len(out):,} segments -> {output}; "
-        f"{out.in_no_entry_zone.sum()} in no-entry zones, {out.in_royal_park.sum()} in Royal Parks"
+        f"{out.in_no_entry_zone.sum()} in no-entry zones, {out.is_bridge.sum()} bridges"
     )
 
 

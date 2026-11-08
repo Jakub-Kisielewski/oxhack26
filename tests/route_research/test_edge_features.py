@@ -1,4 +1,4 @@
-"""Unit tests for edge feature helpers and main-network betweenness."""
+"""Unit tests for edge feature helpers and build output."""
 
 from __future__ import annotations
 
@@ -36,6 +36,11 @@ def test_as_list() -> None:
     assert ef.as_list("a;b") == ["a;b"]
 
 
+def test_is_bridge_tag() -> None:
+    assert ef.is_bridge_tag("yes")
+    assert not ef.is_bridge_tag("no")
+
+
 def test_undirected_keeps_shorter_parallel_edge() -> None:
     graph = nx.MultiDiGraph()
     graph.add_edge(1, 2, key=0, length=10)
@@ -44,18 +49,9 @@ def test_undirected_keeps_shorter_parallel_edge() -> None:
     assert simple[1][2]["length"] == 5
 
 
-def test_main_network_betweenness_is_deterministic() -> None:
-    main = nx.MultiDiGraph()
-    for u, v in [(1, 2), (2, 3), (3, 1)]:
-        main.add_edge(u, v, key=0, length=1.0)
-    first = ef.main_network_betweenness(main)
-    second = ef.main_network_betweenness(main)
-    assert first == second
-
-
-def test_betweenness_uses_one_estimator_on_one_graph(monkeypatch) -> None:
+def test_build_columns_match_route_model_consumers(monkeypatch) -> None:
     walk = nx.MultiDiGraph()
-    walk.add_edge(1, 2, key=0, length=10, highway="primary")
+    walk.add_edge(1, 2, key=0, length=10, highway="primary", bridge="yes")
     walk.add_edge(2, 3, key=0, length=10, highway="footway")
     main = nx.MultiDiGraph()
     main.add_edge(1, 2, key=0, length=10, highway="primary")
@@ -69,6 +65,7 @@ def test_betweenness_uses_one_estimator_on_one_graph(monkeypatch) -> None:
             "width": [None, None],
             "lanes": [None, None],
             "length": [10.0, 10.0],
+            "bridge": ["yes", None],
             "geometry": [
                 LineString([(-0.1, 51.5), (-0.09, 51.5)]),
                 LineString([(-0.09, 51.5), (-0.08, 51.5)]),
@@ -81,9 +78,14 @@ def test_betweenness_uses_one_estimator_on_one_graph(monkeypatch) -> None:
         lambda *a, **k: edges,
     )
     missing = __import__("pathlib").Path("nope")
-    out = ef.build(walk, main, missing, missing)
-    assert "betweenness_walk" not in out.columns
-    off_main = out.loc[out.segment_id == "2:3:0", "betweenness_main"].iloc[0]
-    assert off_main == 0.0
-    rerun = ef.build(walk, main, missing, missing)
-    pd.testing.assert_series_equal(out["betweenness_main"], rerun["betweenness_main"])
+    out = ef.build(walk, main, missing)
+    assert set(out.columns) == {
+        "segment_id",
+        "width_m",
+        "is_main",
+        "is_bridge",
+        "in_no_entry_zone",
+        "in_restricted_zone",
+    }
+    assert out.loc[out.segment_id == "1:2:0", "is_bridge"].iloc[0]
+    assert not out.loc[out.segment_id == "2:3:0", "is_main"].iloc[0]

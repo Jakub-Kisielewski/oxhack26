@@ -136,7 +136,7 @@ def segments_sql(route_dir: Path) -> str | None:
         select.append("COALESCE(c.n_published_route_examples, 0) AS n_published_route_examples")
         joins.append(f"LEFT JOIN read_csv({quote(counts)}, {CSV_OPTIONS}) c USING (segment_id)")
     if feats.exists():
-        select.append("e.* EXCLUDE (segment_id, length_m)")
+        select.append("e.* EXCLUDE (segment_id)")
         joins.append(f"LEFT JOIN read_csv({quote(feats)}, {CSV_OPTIONS}) e USING (segment_id)")
     return f"SELECT {', '.join(select)} FROM ST_Read({quote(geo)}) g {' '.join(joins)}"  # noqa: S608 — paths quoted via quote()
 

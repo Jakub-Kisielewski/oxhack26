@@ -62,15 +62,10 @@ class Segment:
     u: str
     v: str
     length: float
-    road_class: str
     street_name: str
     width: float
-    betweenness: float
-    degree: float
     is_main: bool
     is_bridge: bool
-    is_tunnel: bool
-    royal_park: bool
     restricted: bool
     path: list[LonLat]
     mid: LonLat
@@ -202,11 +197,9 @@ def from_database() -> MarchGraph:
     rows = cur.execute("""
         SELECT segment_id, CAST(u AS VARCHAR), CAST(v AS VARCHAR),
           length_m, road_class, street_name, width_m,
-          COALESCE(betweenness_main,0), to_degree,
           is_main,
           COALESCE(TRY_CAST(is_bridge AS BOOLEAN), false),
-          COALESCE(TRY_CAST(is_tunnel AS BOOLEAN), false),
-          in_no_entry_zone,in_restricted_zone,in_royal_park,
+          in_no_entry_zone, in_restricted_zone,
           ST_AsGeoJSON(geom)
         FROM segments WHERE geom IS NOT NULL
     """).fetchall()
@@ -223,14 +216,10 @@ def from_database() -> MarchGraph:
             road,
             name,
             width,
-            between,
-            degree,
             ismain,
             bridge,
-            tunnel,
             forbidden,
             restricted,
-            park,
             geo,
         ) = row
         sid = str(sid)
@@ -251,15 +240,10 @@ def from_database() -> MarchGraph:
             str(u),
             str(v),
             length,
-            road,
             str(name or ""),
             max(1.0, float(width or 3.0)),
-            max(0.0, float(between or 0)),
-            max(1.0, float(degree or 1)),
             bool(ismain),
             bool(bridge),
-            bool(tunnel),
-            bool(park),
             bool(restricted),
             path,
             path[len(path) // 2],

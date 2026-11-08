@@ -89,9 +89,9 @@ STEPS = [
 def run_step(step: Step, args) -> int:
     if step.kind == "route":
         return route_pipeline.main(["--workdir", str(args.workdir), step.name, *step.args(args)])
-    from src.database import load
+    from src.database.load import main as load_main
 
-    return load.main([])
+    return load_main([])
 
 
 def cached(step: Step, args) -> bool:
