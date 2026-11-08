@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import math
 
-from src.models.features import NAMES, dark_fraction, feature_vector
+from src.models.features import (
+    NAMES,
+    UNREACHABLE_PROGRESS_KM,
+    dark_fraction,
+    feature_vector,
+    reachable_candidates,
+)
 from tests.models.conftest import _pt
 
 
@@ -53,3 +59,16 @@ def test_dark_fraction_respects_march_hours() -> None:
 
 def test_dark_fraction_boundary_at_march_hours() -> None:
     assert dark_fraction(4.0, march_hours=4.0) == 0.0
+
+
+def test_unreachable_progress_is_finite(tiny_graph) -> None:
+    dest = _pt(-0.10, 51.5)
+    net = {"s0": float("inf"), "s1": 100.0, "s2": 50.0}
+    x = feature_vector(tiny_graph, "s0", "s1", dest, net_dist=net)
+    assert x[NAMES.index("progress")] == UNREACHABLE_PROGRESS_KM
+    assert __import__("math").isfinite(x[NAMES.index("progress")])
+
+
+def test_reachable_candidates_drops_inf(tiny_graph) -> None:
+    net = {"s0": 100.0, "s1": 50.0, "s2": float("inf")}
+    assert reachable_candidates(["s1", "s2"], net, "s0") == ["s1"]

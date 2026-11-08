@@ -48,7 +48,8 @@ def tiny_graph() -> MarchGraph:
     s2 = _seg(
         "s2", "n2", "n4", _pt(-0.11, 51.5), _pt(-0.11, 51.51), name="Side Road", is_main=False
     )
-    return MarchGraph({"s0": s0, "s1": s1, "s2": s2})
+    s3 = _seg("s3", "n4", "n3", _pt(-0.11, 51.51), _pt(-0.10, 51.5), name="Side Road")
+    return MarchGraph({"s0": s0, "s1": s1, "s2": s2, "s3": s3})
 
 
 def make_event(

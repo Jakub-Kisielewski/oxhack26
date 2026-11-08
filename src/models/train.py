@@ -52,6 +52,13 @@ def main():
     if len(events) < 2:
         raise SystemExit("Insufficient labelled routes: check DB waypoints and connectivity.")
     model = fit(graph, events, targets_for=mapdata.cause_targets)
+    if not model.fitted:
+        logger.error(
+            "Conditional logit did not converge (loss=%s). Not writing %s.",
+            model.stats.get("loss"),
+            ROUTE_MODEL_PATH,
+        )
+        raise SystemExit(1)
     if not args.no_bootstrap:
         intervals = cluster_bootstrap(
             graph,

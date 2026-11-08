@@ -26,6 +26,7 @@ from src.database import mapdata
 from src.models.destinations import candidates, destination_top3_hit
 from src.models.graph import MarchGraph
 from src.models.labels import TrainingEvent
+from src.models.features import reachable_candidates
 from src.models.route_model import ChoiceModel, fit
 from src.models.types import BacktestResult, BacktestRow
 
@@ -50,7 +51,8 @@ def step_loglik(
     if net_dist is None:
         net_dist = g.network_distances_to(event.destination)
     for a, b in zip(event.route, event.route[1:]):
-        choices = g.next_ids(a)
+        raw = g.next_ids(a)
+        choices = raw if model is None else reachable_candidates(raw, net_dist, a)
         if b not in choices or not choices:
             continue
         if model is None:
@@ -134,14 +136,17 @@ def rollout_path(
     chosen_end: tuple[float, float],
     pick: Callable[[str, list[str]], str],
     max_steps: int,
+    net_dist: dict[str, float] | None = None,
 ) -> list[str]:
     """Rollout without a no-revisit constraint (matches the likelihood)."""
+    if net_dist is None:
+        net_dist = g.network_distances_to(chosen_end)
     cur = start_seg
     path = [cur]
     for _ in range(max_steps):
         if mapdata.distance_m(g.segments[cur].path[-1], chosen_end) < ROLLOUT_STOP_DISTANCE_M:
             break
-        options = g.next_ids(cur)
+        options = reachable_candidates(g.next_ids(cur), net_dist, cur)
         if not options:
             break
         cur = pick(cur, options)
@@ -167,7 +172,7 @@ def _model_rollout(
         )
         return options[int(np.argmax(probs))]
 
-    return rollout_path(g, event.route[0], chosen_end, pick, _max_steps(event))
+    return rollout_path(g, event.route[0], chosen_end, pick, _max_steps(event), net_dist)
 
 
 def _random_walk_jaccard(
@@ -182,7 +187,8 @@ def _random_walk_jaccard(
         def pick(_cur: str, options: list[str], _rng: np.random.Generator = rng) -> str:
             return options[int(_rng.integers(len(options)))]
 
-        path = rollout_path(g, event.route[0], chosen_end, pick, _max_steps(event))
+        net_dist = g.network_distances_to(chosen_end)
+        path = rollout_path(g, event.route[0], chosen_end, pick, _max_steps(event), net_dist)
         scores.append(jaccard(path, event.route))
     return sum(scores) / len(scores) if scores else float("nan")
 

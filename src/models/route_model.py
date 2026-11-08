@@ -11,7 +11,7 @@ from scipy.optimize import minimize
 from scipy.special import softmax
 
 from src.config import BACKTEST_FOLD_MAXITER, LOGIT_MAXITER, LOGIT_REG
-from src.models.features import NAMES, feature_vector
+from src.models.features import NAMES, feature_vector, reachable_candidates
 from src.models.graph import MarchGraph
 from src.models.labels import TrainingEvent
 
@@ -41,7 +41,7 @@ class ChoiceModel:
                     mean=self.mean,
                     std=self.std,
                     features=self.features,
-                    fitted=self.fitted,
+                    fitted=bool(self.fitted),
                     stats=self.stats,
                 ),
                 f,
@@ -80,6 +80,10 @@ class ChoiceModel:
         """Softmax turn probabilities over ``candidates`` at junction ``current``."""
         if not candidates:
             return np.array([])
+        if net_dist is not None:
+            candidates = reachable_candidates(candidates, net_dist, current)
+        if not candidates:
+            return np.array([])
         X = np.stack(
             [
                 feature_vector(
@@ -109,7 +113,7 @@ def fit(
         net_dist = g.network_distances_to(event.destination)
         n = 0
         for k, (current, chosen) in enumerate(zip(event.route, event.route[1:])):
-            options = g.next_ids(current)
+            options = reachable_candidates(g.next_ids(current), net_dist, current)
             if len(options) < 2 or chosen not in options:
                 continue
             X = np.stack(
@@ -127,6 +131,10 @@ def fit(
                     for b in options
                 ]
             )
+            if not np.isfinite(X).all():
+                bad = [name for i, name in enumerate(NAMES) if not np.isfinite(X[:, i]).all()]
+                msg = f"non-finite features at junction {current!r}: {bad}"
+                raise ValueError(msg)
             arrays.append(X)
             indices.append(options.index(chosen))
             weights.append(event.weight[k + 1])
@@ -162,19 +170,21 @@ def fit(
     result = minimize(
         loss_grad, prior, method="L-BFGS-B", jac=True, options={"maxiter": maxiter, "ftol": 1e-7}
     )
+    loss = float(result.fun)
+    fitted = bool(result.success and np.isfinite(loss))
     return ChoiceModel(
         result.x.tolist(),
         means.tolist(),
         std.tolist(),
         NAMES,
-        True,
+        fitted,
         {
             "n_events": n_events,
             "n_choices": len(arrays),
             "weighted_choices": float(w.sum()),
-            "loss": float(result.fun),
+            "loss": loss,
             "converged": bool(result.success),
-            "prior_only": [],
+            "prior_only": [] if fitted else list(NAMES),
             "reg": reg,
         },
     )

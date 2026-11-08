@@ -10,6 +10,8 @@ from src.config import MARCH_HOURS, TARGET_PULL_LENGTH_M
 from src.database import mapdata
 from src.models.graph import MarchGraph, angle
 
+UNREACHABLE_PROGRESS_KM = -1.0
+
 NAMES = (
     "progress",
     "log_width",
@@ -21,6 +23,17 @@ NAMES = (
     "name_continuity",
     "log_length",
 )
+
+
+def reachable_candidates(
+    options: list[str],
+    net_dist: dict[str, float],
+    current: str,
+) -> list[str]:
+    """Drop turn options that cannot reach the destination on the walk network."""
+    if not math.isfinite(net_dist.get(current, math.inf)):
+        return []
+    return [b for b in options if math.isfinite(net_dist.get(b, math.inf))]
 
 
 def dark_fraction(daylight_after_start_h: float | None, march_hours: float = MARCH_HOURS) -> float:
@@ -62,9 +75,12 @@ def feature_vector(
     a = g.segments[current]
     b = g.segments[candidate]
     if net_dist is not None:
-        da = net_dist.get(current, float("inf"))
-        db = net_dist.get(candidate, float("inf"))
-        progress = (da - db) / 1000.0
+        da = net_dist.get(current, math.inf)
+        db = net_dist.get(candidate, math.inf)
+        if not math.isfinite(da) or not math.isfinite(db):
+            progress = UNREACHABLE_PROGRESS_KM
+        else:
+            progress = (da - db) / 1000.0
     else:
         progress = (
             mapdata.distance_m(a.path[-1], destination)
