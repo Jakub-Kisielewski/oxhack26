@@ -37,6 +37,18 @@ def test_line_distance_perpendicular() -> None:
     assert d > 100
 
 
+def test_geometry_runs_breaks_on_missing_segment(tiny_graph) -> None:
+    runs = tiny_graph.geometry_runs(["s0", "missing", "s1"])
+    assert len(runs) == 2
+    assert len(runs[0]) >= 2
+    assert len(runs[1]) >= 2
+
+
+def test_geometry_raises_when_disconnected(tiny_graph) -> None:
+    with pytest.raises(ValueError, match="discontinuous"):
+        tiny_graph.geometry(["s0", "missing", "s1"])
+
+
 def test_next_ids_excludes_uturn(tiny_graph) -> None:
     opts = tiny_graph.next_ids("s0")
     assert "s0" not in opts

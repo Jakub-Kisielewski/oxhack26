@@ -7,6 +7,11 @@ import pydeck as pdk
 from src.database.types import LonLat, Polyline
 from src.models.graph import MarchGraph
 
+# Central London; extent beyond this usually means chord-corrupted geometry.
+MAX_ROUTE_LON = (-0.35, 0.15)
+MAX_ROUTE_LAT = (51.35, 51.65)
+MAX_ROUTE_SPAN_DEG = 0.2
+
 
 def hex_to_rgb(hex_color: str, alpha: int = 200) -> list[int]:
     """Convert ``#rrggbb`` to deck.gl ``[r,g,b,a]``."""
@@ -38,6 +43,22 @@ def path_layer(
     )
 
 
+def path_layers_for_segments(
+    g: MarchGraph,
+    segment_ids: list[str],
+    color_hex: str,
+    width: int = 4,
+    name: str = "",
+) -> list[pdk.Layer]:
+    """One ``PathLayer`` per contiguous geometry run (no chords across gaps)."""
+    runs = g.geometry_runs(segment_ids) if segment_ids else []
+    layers: list[pdk.Layer] = []
+    for i, run in enumerate(runs):
+        label = name if i == 0 else f"{name} (part {i + 1})"
+        layers.append(path_layer(run, color_hex, width, label))
+    return layers
+
+
 def polygon_layers_from_rings(
     rings: tuple[Polyline, ...] | list[Polyline],
     color: list[int],
@@ -64,9 +85,9 @@ def polygon_layers_from_rings(
     ]
 
 
-def geometry_path(g: MarchGraph, segment_ids: list[str]) -> list[LonLat]:
-    """Concatenated coordinates for segment ids."""
-    return g.geometry(segment_ids) if segment_ids else []
+def coords_for_fit(g: MarchGraph, segment_ids: list[str]) -> list[LonLat]:
+    """All points used to frame the map (every contiguous run)."""
+    return [p for run in g.geometry_runs(segment_ids) for p in run]
 
 
 def initial_view_state(g: MarchGraph) -> pdk.ViewState:
@@ -83,7 +104,15 @@ def view_state_for_coords(coords: list[LonLat]) -> pdk.ViewState | None:
         return None
     lons = [float(c[0]) for c in coords]
     lats = [float(c[1]) for c in coords]
-    span = max(max(lons) - min(lons), max(lats) - min(lats), 1e-5)
+    lon_span = max(lons) - min(lons)
+    lat_span = max(lats) - min(lats)
+    span = max(lon_span, lat_span, 1e-5)
+    if span > MAX_ROUTE_SPAN_DEG:
+        return None
+    if min(lons) < MAX_ROUTE_LON[0] or max(lons) > MAX_ROUTE_LON[1]:
+        return None
+    if min(lats) < MAX_ROUTE_LAT[0] or max(lats) > MAX_ROUTE_LAT[1]:
+        return None
     zoom = 14 if span < 0.015 else 13 if span < 0.04 else 12 if span < 0.08 else 11
     return pdk.ViewState(
         longitude=(min(lons) + max(lons)) / 2,

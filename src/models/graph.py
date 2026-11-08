@@ -166,15 +166,43 @@ class MarchGraph:
             )
         return route
 
-    def geometry(self, ids: list[str]) -> list[LonLat]:
-        """Concatenate polylines for ``ids`` into one coordinate list."""
-        points = []
+    def geometry_runs(self, ids: list[str]) -> list[list[LonLat]]:
+        """Contiguous coordinate runs; a missing or non-adjacent id starts a new run."""
+        runs: list[list[LonLat]] = []
+        points: list[LonLat] = []
         for sid in ids:
             if sid not in self.segments:
+                if points:
+                    runs.append(points)
+                    points = []
                 continue
             coords = self.segments[sid].path
-            points.extend(coords[1:] if points and points[-1] == coords[0] else coords)
-        return points
+            if not coords:
+                continue
+            if not points:
+                points = list(coords)
+                continue
+            if points[-1] == coords[0]:
+                points.extend(coords[1:])
+            else:
+                runs.append(points)
+                points = list(coords)
+        if points:
+            runs.append(points)
+        return runs
+
+    def geometry(self, ids: list[str]) -> list[LonLat]:
+        """Concatenate one contiguous polyline; raises if the path is disconnected."""
+        runs = self.geometry_runs(ids)
+        if not runs:
+            return []
+        if len(runs) > 1:
+            msg = (
+                "discontinuous path across missing or non-adjacent segments; "
+                "use geometry_runs() for map rendering"
+            )
+            raise ValueError(msg)
+        return runs[0]
 
 
 def line_distance(p: LonLat, line: list[LonLat]) -> float:

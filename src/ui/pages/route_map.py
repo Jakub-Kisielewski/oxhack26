@@ -192,43 +192,36 @@ def _route_layers(
     show_route: bool,
     show_sp: bool,
     show_rw: bool,
-) -> tuple[list[pdk.Layer], list]:
+) -> tuple[list[pdk.Layer], list, bool]:
     layers: list[pdk.Layer] = []
     fit_coords: list = []
+    fragmented = False
     paths = paths_for_event(bt, event_id)
     actual = (bt.actual_routes or {}).get(event_id, [])
+
+    def add_route(ids: list[str], color: str, width: int, name: str) -> None:
+        nonlocal fragmented
+        if len(g.geometry_runs(ids)) > 1:
+            fragmented = True
+        fit_coords.extend(map_layers.coords_for_fit(g, ids))
+        layers.extend(map_layers.path_layers_for_segments(g, ids, color, width, name))
 
     if what_if:
         wpath = st.session_state.get("what_if_path")
         if wpath:
-            geo = map_layers.geometry_path(g, wpath)
-            fit_coords.extend(geo)
-            layers.append(
-                map_layers.path_layer(geo, MODEL_COLORS[0], width=5, name="What-if route")
-            )
-        return layers, fit_coords
+            add_route(wpath, MODEL_COLORS[0], 5, "What-if route")
+        return layers, fit_coords, fragmented
 
     if show_actual and actual:
-        geo = map_layers.geometry_path(g, actual)
-        fit_coords.extend(geo)
-        layers.append(map_layers.path_layer(geo, "#000000", width=7, name="Actual"))
+        add_route(actual, "#000000", 7, "Actual")
     for model, visible in (
         ("route_model", show_route),
         ("shortest_path", show_sp),
         ("random_walk", show_rw),
     ):
         if visible and model in paths:
-            geo = map_layers.geometry_path(g, paths[model])
-            fit_coords.extend(geo)
-            layers.append(
-                map_layers.path_layer(
-                    geo,
-                    MODEL_ROUTE_COLORS[model],
-                    width=4,
-                    name=MAP_LABELS[model],
-                )
-            )
-    return layers, fit_coords
+            add_route(paths[model], MODEL_ROUTE_COLORS[model], 4, MAP_LABELS[model])
+    return layers, fit_coords, fragmented
 
 
 def _junction_explainer(
@@ -264,6 +257,21 @@ def _junction_explainer(
             st.caption("No alternative at this junction.")
 
 
+def _map_view(fit_coords: list, g: MarchGraph) -> pdk.ViewState:
+    view = map_layers.view_state_for_coords(fit_coords)
+    if view is None and fit_coords:
+        span = max(
+            max(c[0] for c in fit_coords) - min(c[0] for c in fit_coords),
+            max(c[1] for c in fit_coords) - min(c[1] for c in fit_coords),
+        )
+        if span > map_layers.MAX_ROUTE_SPAN_DEG:
+            st.error(
+                "Route coordinates span an implausible area (graph/backtest mismatch). "
+                "Rebuild the graph and backtest, then reload this page."
+            )
+    return view if view is not None else map_layers.initial_view_state(g)
+
+
 def render() -> None:
     """Draw the route comparison map."""
     st.title("Route comparison")
@@ -294,9 +302,17 @@ def render() -> None:
 
     with st.sidebar:
         sidebar = _sidebar(bt, events, by_id, event_ids)
-        event_id, ev, show_actual, show_route, show_sp, show_rw, show_boundary, show_zones, cause = (
-            sidebar
-        )
+        (
+            event_id,
+            ev,
+            show_actual,
+            show_route,
+            show_sp,
+            show_rw,
+            show_boundary,
+            show_zones,
+            cause,
+        ) = sidebar
 
     what_if = st.session_state.get("what_if_active", False)
     if what_if:
@@ -304,15 +320,20 @@ def render() -> None:
     else:
         st.success("Held-out prediction: this model never saw this march.")
 
-    route_layers, fit_coords = _route_layers(
+    route_layers, fit_coords, fragmented = _route_layers(
         g, bt, event_id, what_if, show_actual, show_route, show_sp, show_rw
     )
+    if fragmented:
+        st.warning(
+            "Some path segments are missing from the loaded street graph; "
+            "routes are drawn as separate pieces (no chords across gaps). "
+            "Re-run `python -m src.models.train --force-graph` if this persists."
+        )
     layers = _context_layers(show_boundary, show_zones) + route_layers
-    view = map_layers.view_state_for_coords(fit_coords) or map_layers.initial_view_state(g)
     st.pydeck_chart(
         pdk.Deck(
             layers=layers,
-            initial_view_state=view,
+            initial_view_state=_map_view(fit_coords, g),
             map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
         ),
         height=480,
