@@ -4,6 +4,7 @@ from src.ui.backtest_display import (
     METRICS,
     event_count_caption,
     event_counts,
+    format_overlap_pct,
     metric_format,
     model_order,
 )
@@ -59,8 +60,14 @@ def test_metric_format_log_likelihood() -> None:
 
 
 def test_metric_format_jaccard() -> None:
-    assert metric_format("top1_jaccard") == ".0%"
-    assert METRICS["top1_jaccard"][2] == ".0%"
+    assert metric_format("top1_jaccard") == ".1%"
+    assert METRICS["top1_jaccard"][1] == ".1%"
+
+
+def test_format_overlap_pct() -> None:
+    assert format_overlap_pct(0.5673076923076923) == "56.7%"
+    assert format_overlap_pct(0) == "0.0%"
+    assert format_overlap_pct(None) == "—"
 
 
 def test_event_count_caption_unequal_counts() -> None:

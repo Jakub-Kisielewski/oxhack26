@@ -160,8 +160,8 @@ The same suite runs in CI on every push and pull request.
 ```bash
 streamlit run app.py
 ```
-- **Backtest results** — charts, coefficient table, and per-event metrics from `data/models/backtest.json`.
-- **Route comparison** — pydeck map of actual vs leave-one-out model paths; optional what-if rollout on the full-data model (DuckDB required for zones and event context).
+- **Model performance** — charts, coefficient table, and per-event metrics from `data/models/backtest.json`.
+- **Route comparison** — pydeck map of actual vs leave-one-out model paths (DuckDB optional for zones boundary overlays and event context captions).
 - Close the app before re-running `python ingest.py`: it holds the database open.
 
 ## Database

@@ -17,7 +17,7 @@ from src.models.labels import TrainingEvent
 
 
 # Shrink toward small, interpretable prior effects on standardised features.
-PRIOR = np.array([0.5, 0.1, 0.1, -0.5, 0.1, -0.3, 0.15, 0.2, -0.05], dtype=float)
+PRIOR = np.array([0.5, 0.1, 0.1, -0.5, 0.1, 0.15, 0.2, -0.05], dtype=float)
 
 
 @dataclass
@@ -54,6 +54,17 @@ class ChoiceModel:
         with open(path) as f:
             d = json.load(f)
         saved = list(d["features"])
+        if "restricted" in saved:
+            ri = saved.index("restricted")
+            for key in ("theta", "mean", "std"):
+                arr = list(d[key])
+                arr.pop(ri)
+                d[key] = arr
+            saved.pop(ri)
+            stats = dict(d.get("stats") or {})
+            po = [n for n in stats.get("prior_only") or [] if n != "restricted"]
+            stats["prior_only"] = po
+            d["stats"] = stats
         if saved != list(NAMES)[: len(saved)]:
             raise ValueError("Feature version mismatch; retrain model")
         n = len(saved)

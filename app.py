@@ -8,7 +8,7 @@ st.navigation(
     [
         st.Page(
             "src/ui/pages/model_insights.py",
-            title="Backtest results",
+            title="Model performance",
             icon=":material/insights:",
             default=True,
         ),

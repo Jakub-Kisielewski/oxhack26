@@ -7,18 +7,32 @@ MODEL_LABELS = {
     "shortest_path": "Shortest path",
     "random_walk": "Random walk",
 }
-METRICS = {
-    "mean_log_likelihood": (
-        "Log-likelihood per step",
-        "Higher is better: probability assigned to the true route, step by step.",
-        ".2f",
-    ),
-    "top1_jaccard": (
-        "Top route overlap",
-        "Share of the true route's streets that the top predicted route uses.",
-        ".0%",
-    ),
+
+# Shared across charts and map: one accent, muted baselines, dark actual.
+MODEL_PALETTE_HEX = {
+    "route_model": "#2563EB",
+    "shortest_path": "#94A3B8",
+    "random_walk": "#CBD5E1",
+    "actual": "#64748B",
 }
+MODEL_COLORS = [
+    MODEL_PALETTE_HEX["route_model"],
+    MODEL_PALETTE_HEX["shortest_path"],
+    MODEL_PALETTE_HEX["random_walk"],
+]
+OVERLAP_PCT_DECIMALS = 1
+
+METRICS = {
+    "mean_log_likelihood": ("Log-likelihood per step", ".2f"),
+    "top1_jaccard": ("Route overlap", ".1%"),
+}
+
+
+def format_overlap_pct(fraction: float | None) -> str:
+    """Human percent string for a 0–1 Jaccard score (e.g. ``56.7%``)."""
+    if fraction is None:
+        return "—"
+    return f"{float(fraction) * 100:.{OVERLAP_PCT_DECIMALS}f}%"
 
 
 def model_order(summary: dict[str, dict[str, float]]) -> list[str]:
@@ -35,7 +49,7 @@ def event_counts(summary: dict[str, dict[str, float]], metric: str) -> dict[str,
 
 def metric_format(metric: str) -> str:
     """Altair axis / tooltip format string for a summary metric key."""
-    return METRICS[metric][2]
+    return METRICS[metric][1]
 
 
 def event_count_caption(

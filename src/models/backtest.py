@@ -140,6 +140,8 @@ def rollout_path(
     net_dist: dict[str, float] | None = None,
 ) -> list[str]:
     """Rollout without a no-revisit constraint (matches the likelihood)."""
+    if not start_seg or start_seg not in g.segments:
+        return []
     if net_dist is None:
         net_dist = g.network_distances_to(chosen_end)
     cur = start_seg

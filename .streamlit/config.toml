@@ -1,3 +1,11 @@
 [theme]
-# Blue from the chart palette (categorical slot 1 / sequential ramp), so buttons and charts agree.
-primaryColor = "#2a78d6"
+base = "light"
+primaryColor = "#2563EB"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F8FAFC"
+textColor = "#0F172A"
+font = "sans serif"
+borderColor = "#E2E8F0"
+
+[client]
+toolbarMode = "minimal"

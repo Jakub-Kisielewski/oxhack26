@@ -18,7 +18,6 @@ NAMES = (
     "is_main",
     "turn",
     "target_pull",
-    "restricted",
     "is_bridge",
     "name_continuity",
     "log_length",
@@ -64,10 +63,11 @@ def feature_vector(
     3. **is_main** — 1 if ``candidate`` is classified as a main road.
     4. **turn** — normalised turn angle in ``[0, 1]`` from ``current`` into ``candidate``.
     5. **target_pull** — weighted sum of cause targets, exponential kernel in meters.
-    6. **restricted** — 1 if ``candidate`` lies in a restricted zone.
-    7. **is_bridge** — 1 if ``candidate`` crosses a bridge (e.g. Thames).
-    8. **name_continuity** — 1 if street name matches ``current``.
-    9. **log_length** — log segment length (m) of ``candidate``.
+    6. **is_bridge** — 1 if ``candidate`` crosses a bridge (e.g. Thames).
+    7. **name_continuity** — 1 if street name matches ``current``.
+    8. **log_length** — log segment length (m) of ``candidate``.
+
+    Restricted-activity zones are shown on the route map only; they are not model features.
     """
     del history  # removed from the feature set; kept for call-site compatibility
     context = context or {}
@@ -101,7 +101,6 @@ def feature_vector(
             float(b.is_main),
             angle(a.end_bearing, b.start_bearing),
             pull,
-            float(b.restricted),
             float(b.is_bridge),
             name_match,
             math.log(max(1.0, b.length)),
